@@ -1,4 +1,3 @@
-
 interface SpeechDetectionProps {
   onSpeechDetected: () => void;
   onSpeechEnded: () => void;
@@ -20,8 +19,9 @@ export class SpeechDetection {
   private minDecibels: number;
   private consecutiveSilenceFrames = 0;
   private consecutiveSpeechFrames = 0;
+  private volumeHistory: number[] = [];
 
-  constructor({ onSpeechDetected, onSpeechEnded, minDecibels = -75 }: SpeechDetectionProps) {
+  constructor({ onSpeechDetected, onSpeechEnded, minDecibels = -60 }: SpeechDetectionProps) {
     this.onSpeechDetected = onSpeechDetected;
     this.onSpeechEnded = onSpeechEnded;
     this.minDecibels = minDecibels;
@@ -33,17 +33,19 @@ export class SpeechDetection {
       
       this.audioContext = new AudioContext();
       this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = 2048;
       this.analyser.minDecibels = this.minDecibels;
-      this.analyser.fftSize = 512; // Reduced for better performance
-      this.analyser.smoothingTimeConstant = 0.3; // Less smoothing for better responsiveness
+      this.analyser.maxDecibels = -10;
+      this.analyser.smoothingTimeConstant = 0.1;
       
-      // Request microphone access with enhanced settings for human voice
+      // Enhanced microphone settings for better voice detection
       this.stream = await navigator.mediaDevices.getUserMedia({ 
         audio: { 
           echoCancellation: true,
-          noiseSuppression: false, // Disabled to catch quieter voices
+          noiseSuppression: false,
           autoGainControl: true,
-          sampleRate: 44100
+          sampleRate: 44100,
+          channelCount: 1
         } 
       });
       
@@ -51,9 +53,10 @@ export class SpeechDetection {
       this.mediaStreamSource.connect(this.analyser);
       
       this.isListening = true;
+      this.volumeHistory = [];
       this.detectSound();
       
-      console.log("Speech detection started with enhanced sensitivity");
+      console.log("Enhanced speech detection started - ready for all voice levels");
       return true;
     } catch (error) {
       console.error("Error starting speech detection:", error);
@@ -94,34 +97,62 @@ export class SpeechDetection {
     this.isSpeaking = false;
     this.consecutiveSilenceFrames = 0;
     this.consecutiveSpeechFrames = 0;
+    this.volumeHistory = [];
     console.log("Speech detection stopped");
+  }
+
+  private getVolumeLevel(): number {
+    if (!this.analyser) return 0;
+    
+    const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+    this.analyser.getByteFrequencyData(dataArray);
+    
+    // Calculate RMS (Root Mean Square) for better volume detection
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      sum += dataArray[i] * dataArray[i];
+    }
+    const rms = Math.sqrt(sum / dataArray.length);
+    
+    // Focus on human voice frequency range (85Hz - 3000Hz)
+    // This roughly corresponds to indices 10-150 in our frequency data
+    const voiceRange = dataArray.slice(10, 150);
+    const voiceSum = voiceRange.reduce((acc, val) => acc + val, 0);
+    const voiceAverage = voiceSum / voiceRange.length;
+    
+    // Combine RMS and voice-focused detection
+    return Math.max(rms, voiceAverage);
   }
 
   private detectSound = (): void => {
     if (!this.isListening || !this.analyser) return;
 
-    const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-    this.analyser.getByteFrequencyData(dataArray);
-
-    // Enhanced algorithm for human voice detection
-    // Focus on human voice frequency range (85Hz - 3000Hz approximately)
-    const humanVoiceRange = dataArray.slice(5, 100); // Approximate range for human voice
-    const average = humanVoiceRange.reduce((acc, val) => acc + val, 0) / humanVoiceRange.length;
+    const currentVolume = this.getVolumeLevel();
     
-    // Much lower threshold for better sensitivity
-    const threshold = 2;
+    // Keep a rolling history of volume levels for better detection
+    this.volumeHistory.push(currentVolume);
+    if (this.volumeHistory.length > 10) {
+      this.volumeHistory.shift();
+    }
+    
+    // Calculate dynamic threshold based on background noise
+    const backgroundNoise = Math.min(...this.volumeHistory.slice(0, 5)) || 0;
+    const dynamicThreshold = Math.max(backgroundNoise + 5, 8); // Minimum threshold of 8
+    
     const now = Date.now();
     
-    if (average > threshold) {
+    console.log(`Volume: ${currentVolume.toFixed(2)}, Threshold: ${dynamicThreshold.toFixed(2)}`);
+    
+    if (currentVolume > dynamicThreshold) {
       // Speech detected
       this.consecutiveSpeechFrames++;
       this.consecutiveSilenceFrames = 0;
       
-      // Trigger speech detection immediately for better responsiveness
-      if (this.consecutiveSpeechFrames > 1 && !this.isSpeaking) {
+      // Trigger speech detection after just 2 consecutive frames for responsiveness
+      if (this.consecutiveSpeechFrames >= 2 && !this.isSpeaking) {
         this.isSpeaking = true;
         this.onSpeechDetected();
-        console.log("Speech detected with average:", average);
+        console.log(`Speech STARTED - Volume: ${currentVolume.toFixed(2)}`);
       }
       
       this.lastSpeechTime = now;
@@ -132,15 +163,16 @@ export class SpeechDetection {
         this.silenceTimeout = null;
       }
     } else {
+      // Silence detected
       this.consecutiveSilenceFrames++;
       this.consecutiveSpeechFrames = 0;
       
-      // Consider speech ended after consistent silence
-      if (this.isSpeaking && this.consecutiveSilenceFrames > 15) {
-        if (now - this.lastSpeechTime > 500) { // Reduced silence duration
+      // End speech after consistent silence (reduced from 15 to 8 frames)
+      if (this.isSpeaking && this.consecutiveSilenceFrames >= 8) {
+        if (now - this.lastSpeechTime > 300) { // Reduced from 500ms to 300ms
           this.isSpeaking = false;
           this.onSpeechEnded();
-          console.log("Speech ended after", now - this.lastSpeechTime, "ms of silence");
+          console.log(`Speech ENDED after ${now - this.lastSpeechTime}ms of silence`);
         }
       }
     }

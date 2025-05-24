@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { SpeechDetection } from "@/utils/speechDetection";
 import TargetSelector from "@/components/TargetSelector";
 import CompletionAlert from "@/components/CompletionAlert";
-import { Mic, MicOff, Volume, Volume2 } from "lucide-react";
+import { Mic, MicOff, Volume, Volume2, VolumeX } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { getLifetimeCount, getTodayCount, updateMantraCounts } from "@/utils/indexedDBUtils";
 
@@ -14,7 +14,7 @@ const MantraCounter: React.FC = () => {
   const [micPermission, setMicPermission] = useState<boolean | null>(null);
   const [showCompletionAlert, setShowCompletionAlert] = useState<boolean>(false);
   const [audioLevel, setAudioLevel] = useState<number>(0);
-  const [sensitivityLevel, setSensitivityLevel] = useState<number>(2); // Start with high sensitivity
+  const [sensitivityLevel, setSensitivityLevel] = useState<number>(1); // Start with medium sensitivity
   const [lifetimeCount, setLifetimeCount] = useState<number>(0);
   const [todayCount, setTodayCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -67,7 +67,7 @@ const MantraCounter: React.FC = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach(track => track.stop());
       setMicPermission(true);
-      toast.success("Microphone access granted");
+      toast.success("Microphone access granted - Ready for voice detection");
       return true;
     } catch (error) {
       console.error("Error requesting microphone permission:", error);
@@ -83,19 +83,20 @@ const MantraCounter: React.FC = () => {
       if (!granted) return;
     }
     
-    const minDecibelsSettings = [-45, -65, -80]; // Made more sensitive across all levels
+    // More sensitive settings for better voice detection
+    const minDecibelsSettings = [-40, -55, -70]; // Much more sensitive across all levels
     
     if (!speechDetection.current) {
       speechDetection.current = new SpeechDetection({
         onSpeechDetected: () => {
           speechDetected.current = true;
-          setAudioLevel(prev => Math.min(100, prev + 30)); // Visual feedback
-          console.log("Speech detected");
+          setAudioLevel(prev => Math.min(100, prev + 40)); // Enhanced visual feedback
+          console.log("🎤 Voice detected!");
         },
         onSpeechEnded: () => {
           if (speechDetected.current) {
             const now = Date.now();
-            if (now - lastSpeechTime.current > 600) { // Reduced delay
+            if (now - lastSpeechTime.current > 400) { // Reduced delay for better responsiveness
               setCurrentCount(count => {
                 const newCount = count + 1;
                 
@@ -105,14 +106,14 @@ const MantraCounter: React.FC = () => {
                   setTodayCount(newToday);
                 }).catch(console.error);
                 
-                toast.success(`Mantra counted: ${newCount}`, {
-                  duration: 1000,
+                toast.success(`✨ Mantra counted: ${newCount}`, {
+                  duration: 1500,
                   style: { background: '#262626', color: '#fcd34d' },
                 });
                 
                 return newCount;
               });
-              console.log("Mantra counted");
+              console.log("📿 Mantra successfully counted!");
             }
             lastSpeechTime.current = now;
             speechDetected.current = false;
@@ -127,18 +128,18 @@ const MantraCounter: React.FC = () => {
     if (started) {
       setIsListening(true);
       lastSpeechTime.current = Date.now();
-      toast.success(`Listening for mantras (Sensitivity: ${getSensitivityLabel()})`, {
+      toast.success(`🎧 Listening for mantras (${getSensitivityLabel()} sensitivity)`, {
         style: { background: '#262626', color: '#fcd34d' }
       });
     } else {
-      toast.error("Failed to start listening. Please try again.", {
+      toast.error("❌ Failed to start listening. Please try again.", {
         style: { background: '#262626', color: '#fcd34d' }
       });
     }
   };
 
   const getSensitivityLabel = () => {
-    const labels = ["Low", "Medium", "High"];
+    const labels = ["High (Loud voices)", "Medium (Normal voices)", "Ultra (Quiet voices)"];
     return labels[sensitivityLevel];
   };
 
@@ -151,13 +152,14 @@ const MantraCounter: React.FC = () => {
     setSensitivityLevel((prev) => (prev + 1) % 3);
     
     if (wasListening) {
-      // Small delay to ensure the previous instance is properly cleaned up
       setTimeout(() => {
         startListening();
       }, 300);
     }
     
-    toast.info(`Microphone sensitivity: ${getSensitivityLabel()}`, {
+    const newLevel = (sensitivityLevel + 1) % 3;
+    const labels = ["High (Loud voices)", "Medium (Normal voices)", "Ultra (Quiet voices)"];
+    toast.info(`🔊 Microphone sensitivity: ${labels[newLevel]}`, {
       style: { background: '#262626', color: '#fcd34d' }
     });
   };
@@ -169,7 +171,7 @@ const MantraCounter: React.FC = () => {
     }
     setIsListening(false);
     setAudioLevel(0);
-    toast.info("Stopped listening", {
+    toast.info("🔇 Stopped listening", {
       style: { background: '#262626', color: '#fcd34d' }
     });
   };
@@ -203,7 +205,7 @@ const MantraCounter: React.FC = () => {
   const getSensitivityIcon = () => {
     if (sensitivityLevel === 0) return <Volume className="w-5 h-5" />;
     if (sensitivityLevel === 1) return <Volume2 className="w-5 h-5" />;
-    return <Volume2 className="w-5 h-5" />;
+    return <VolumeX className="w-5 h-5" />; // Ultra sensitive
   };
 
   if (isLoading) {
@@ -255,16 +257,16 @@ const MantraCounter: React.FC = () => {
             </div>
           </div>
           
-          {/* Listening indicator */}
+          {/* Enhanced listening indicator */}
           {isListening && (
             <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex space-x-1">
               {[...Array(5)].map((_, i) => (
                 <div 
                   key={i} 
-                  className={`w-1 rounded-full transition-all ${
-                    audioLevel > i * 20 ? 'bg-white' : 'bg-amber-700'
+                  className={`w-1.5 rounded-full transition-all duration-150 ${
+                    audioLevel > i * 20 ? 'bg-white animate-pulse' : 'bg-amber-700'
                   }`} 
-                  style={{ height: `${Math.min(8 + (i * 3), 20) + (audioLevel > i * 20 ? 4 : 0)}px` }}
+                  style={{ height: `${Math.min(8 + (i * 3), 20) + (audioLevel > i * 20 ? 6 : 0)}px` }}
                 />
               ))}
             </div>
@@ -274,8 +276,8 @@ const MantraCounter: React.FC = () => {
         <button 
           onClick={toggleListening}
           className={`absolute -bottom-5 left-1/2 transform -translate-x-1/2 flex items-center justify-center w-16 h-16 rounded-full shadow-lg ${
-            isListening ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-500 hover:bg-amber-600'
-          } text-black transition-colors`}
+            isListening ? 'bg-red-600 hover:bg-red-700 animate-pulse' : 'bg-amber-500 hover:bg-amber-600'
+          } text-black transition-all duration-300`}
         >
           {isListening ? (
             <MicOff className="w-7 h-7" />
@@ -288,13 +290,13 @@ const MantraCounter: React.FC = () => {
       <div className="text-center mb-5">
         <p className="text-gray-300">
           {isListening 
-            ? "Listening active - Speak your mantra with 1 second pauses"
-            : "Press the microphone button to start listening"}
+            ? "🎤 Actively listening - Speak your mantra (any volume level)"
+            : "Press the microphone button to start voice detection"}
         </p>
         <p className="text-xs text-gray-400 mt-1">
           {isListening
-            ? "ध्वनि सक्रिय - 1 सेकंड के अंतराल के साथ मंत्र का जाप करें"
-            : "सुनना शुरू करने के लिए माइक्रोफोन बटन दबाएं"}
+            ? "ध्वनि सक्रिय - किसी भी आवाज़ की मात्रा में मंत्र जाप करें"
+            : "आवाज़ की पहचान शुरू करने के लिए माइक्रोफोन बटन दबाएं"}
         </p>
       </div>
       
@@ -303,7 +305,7 @@ const MantraCounter: React.FC = () => {
         className="flex items-center justify-center gap-2 mb-5 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-full text-sm font-medium text-amber-400 transition-colors"
       >
         {getSensitivityIcon()}
-        <span>Sensitivity: {getSensitivityLabel()}</span>
+        <span>Sensitivity: {getSensitivityLabel().split(' ')[0]}</span>
       </button>
       
       <div className="flex gap-4">
