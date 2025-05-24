@@ -14,15 +14,13 @@ const MantraCounter: React.FC = () => {
   const [micPermission, setMicPermission] = useState<boolean | null>(null);
   const [showCompletionAlert, setShowCompletionAlert] = useState<boolean>(false);
   const [audioLevel, setAudioLevel] = useState<number>(0);
-  const [sensitivityLevel, setSensitivityLevel] = useState<number>(1); // Start with medium sensitivity
+  const [sensitivityLevel, setSensitivityLevel] = useState<number>(2); // Start with ultra sensitivity
   const [lifetimeCount, setLifetimeCount] = useState<number>(0);
   const [todayCount, setTodayCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const speechDetection = useRef<SpeechDetection | null>(null);
-  const lastSpeechTime = useRef<number>(0);
-  const speechDetected = useRef<boolean>(false);
+  const lastCountTime = useRef<number>(0);
 
-  // Load saved counts from IndexedDB on component mount
   useEffect(() => {
     const loadCounts = async () => {
       try {
@@ -43,7 +41,6 @@ const MantraCounter: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Check if target is reached
     if (targetCount !== null && currentCount >= targetCount && targetCount > 0) {
       handleCompletion();
     }
@@ -67,12 +64,12 @@ const MantraCounter: React.FC = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach(track => track.stop());
       setMicPermission(true);
-      toast.success("Microphone access granted - Ready for voice detection");
+      toast.success("🎤 Microphone access granted - Ready for ultra-sensitive voice detection");
       return true;
     } catch (error) {
       console.error("Error requesting microphone permission:", error);
       setMicPermission(false);
-      toast.error("Microphone access denied. Please enable microphone access in your browser settings.");
+      toast.error("❌ Microphone access denied. Please enable microphone access in your browser settings.");
       return false;
     }
   };
@@ -83,40 +80,38 @@ const MantraCounter: React.FC = () => {
       if (!granted) return;
     }
     
-    // More sensitive settings for better voice detection
-    const minDecibelsSettings = [-40, -55, -70]; // Much more sensitive across all levels
+    // Ultra-sensitive settings for all sensitivity levels
+    const minDecibelsSettings = [-60, -75, -90]; // All very sensitive
     
     if (!speechDetection.current) {
       speechDetection.current = new SpeechDetection({
         onSpeechDetected: () => {
-          speechDetected.current = true;
-          setAudioLevel(prev => Math.min(100, prev + 40)); // Enhanced visual feedback
-          console.log("🎤 Voice detected!");
+          setAudioLevel(100); // Full visual feedback
+          console.log("🎤 Voice detected - preparing to count!");
         },
         onSpeechEnded: () => {
-          if (speechDetected.current) {
-            const now = Date.now();
-            if (now - lastSpeechTime.current > 400) { // Reduced delay for better responsiveness
-              setCurrentCount(count => {
-                const newCount = count + 1;
-                
-                // Update counts in IndexedDB
-                updateMantraCounts(1).then(({ lifetimeCount: newLifetime, todayCount: newToday }) => {
-                  setLifetimeCount(newLifetime);
-                  setTodayCount(newToday);
-                }).catch(console.error);
-                
-                toast.success(`✨ Mantra counted: ${newCount}`, {
-                  duration: 1500,
-                  style: { background: '#262626', color: '#fcd34d' },
-                });
-                
-                return newCount;
+          const now = Date.now();
+          // Prevent double counting with 500ms cooldown
+          if (now - lastCountTime.current > 500) {
+            setCurrentCount(count => {
+              const newCount = count + 1;
+              
+              // Update counts in IndexedDB
+              updateMantraCounts(1).then(({ lifetimeCount: newLifetime, todayCount: newToday }) => {
+                setLifetimeCount(newLifetime);
+                setTodayCount(newToday);
+              }).catch(console.error);
+              
+              toast.success(`🕉️ Mantra counted: ${newCount}`, {
+                duration: 2000,
+                style: { background: '#262626', color: '#fcd34d' },
               });
-              console.log("📿 Mantra successfully counted!");
-            }
-            lastSpeechTime.current = now;
-            speechDetected.current = false;
+              
+              return newCount;
+            });
+            
+            lastCountTime.current = now;
+            console.log("📿 Mantra successfully counted!");
           }
           setAudioLevel(0); // Reset visual feedback
         },
@@ -127,19 +122,19 @@ const MantraCounter: React.FC = () => {
     const started = await speechDetection.current.start();
     if (started) {
       setIsListening(true);
-      lastSpeechTime.current = Date.now();
-      toast.success(`🎧 Listening for mantras (${getSensitivityLabel()} sensitivity)`, {
+      lastCountTime.current = Date.now();
+      toast.success(`🎧 Ultra-sensitive listening started - even whispers will be detected!`, {
         style: { background: '#262626', color: '#fcd34d' }
       });
     } else {
-      toast.error("❌ Failed to start listening. Please try again.", {
+      toast.error("❌ Failed to start listening. Please check microphone permissions.", {
         style: { background: '#262626', color: '#fcd34d' }
       });
     }
   };
 
   const getSensitivityLabel = () => {
-    const labels = ["High (Loud voices)", "Medium (Normal voices)", "Ultra (Quiet voices)"];
+    const labels = ["Normal", "High", "Ultra"];
     return labels[sensitivityLevel];
   };
 
@@ -154,12 +149,12 @@ const MantraCounter: React.FC = () => {
     if (wasListening) {
       setTimeout(() => {
         startListening();
-      }, 300);
+      }, 500);
     }
     
     const newLevel = (sensitivityLevel + 1) % 3;
-    const labels = ["High (Loud voices)", "Medium (Normal voices)", "Ultra (Quiet voices)"];
-    toast.info(`🔊 Microphone sensitivity: ${labels[newLevel]}`, {
+    const labels = ["Normal", "High", "Ultra"];
+    toast.info(`🔊 Sensitivity: ${labels[newLevel]} - Detecting ${newLevel === 2 ? 'whispers' : newLevel === 1 ? 'quiet voices' : 'normal voices'}`, {
       style: { background: '#262626', color: '#fcd34d' }
     });
   };
@@ -290,13 +285,13 @@ const MantraCounter: React.FC = () => {
       <div className="text-center mb-5">
         <p className="text-gray-300">
           {isListening 
-            ? "🎤 Actively listening - Speak your mantra (any volume level)"
-            : "Press the microphone button to start voice detection"}
+            ? "🎤 Listening actively - Speak your mantra at ANY volume!"
+            : "Press the microphone button to start ultra-sensitive voice detection"}
         </p>
         <p className="text-xs text-gray-400 mt-1">
           {isListening
-            ? "ध्वनि सक्रिय - किसी भी आवाज़ की मात्रा में मंत्र जाप करें"
-            : "आवाज़ की पहचान शुरू करने के लिए माइक्रोफोन बटन दबाएं"}
+            ? "अल्ट्रा संवेदनशील सुनना - किसी भी आवाज़ में मंत्र बोलें!"
+            : "अति संवेदनशील आवाज़ पहचान शुरू करने के लिए माइक्रोफोन दबाएं"}
         </p>
       </div>
       
@@ -305,7 +300,7 @@ const MantraCounter: React.FC = () => {
         className="flex items-center justify-center gap-2 mb-5 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-full text-sm font-medium text-amber-400 transition-colors"
       >
         {getSensitivityIcon()}
-        <span>Sensitivity: {getSensitivityLabel().split(' ')[0]}</span>
+        <span>Sensitivity: {getSensitivityLabel()}</span>
       </button>
       
       <div className="flex gap-4">

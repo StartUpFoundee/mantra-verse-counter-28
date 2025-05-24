@@ -1,3 +1,4 @@
+
 interface SpeechDetectionProps {
   onSpeechDetected: () => void;
   onSpeechEnded: () => void;
@@ -17,11 +18,11 @@ export class SpeechDetection {
   private onSpeechDetected: () => void;
   private onSpeechEnded: () => void;
   private minDecibels: number;
-  private consecutiveSilenceFrames = 0;
   private consecutiveSpeechFrames = 0;
-  private volumeHistory: number[] = [];
+  private baselineNoise = 0;
+  private volumeBuffer: number[] = [];
 
-  constructor({ onSpeechDetected, onSpeechEnded, minDecibels = -60 }: SpeechDetectionProps) {
+  constructor({ onSpeechDetected, onSpeechEnded, minDecibels = -70 }: SpeechDetectionProps) {
     this.onSpeechDetected = onSpeechDetected;
     this.onSpeechEnded = onSpeechEnded;
     this.minDecibels = minDecibels;
@@ -33,12 +34,14 @@ export class SpeechDetection {
       
       this.audioContext = new AudioContext();
       this.analyser = this.audioContext.createAnalyser();
-      this.analyser.fftSize = 2048;
-      this.analyser.minDecibels = this.minDecibels;
-      this.analyser.maxDecibels = -10;
-      this.analyser.smoothingTimeConstant = 0.1;
       
-      // Enhanced microphone settings for better voice detection
+      // Ultra-sensitive settings for very quiet voices
+      this.analyser.fftSize = 2048;
+      this.analyser.minDecibels = -90;
+      this.analyser.maxDecibels = -10;
+      this.analyser.smoothingTimeConstant = 0.3;
+      
+      // Request microphone with maximum sensitivity
       this.stream = await navigator.mediaDevices.getUserMedia({ 
         audio: { 
           echoCancellation: true,
@@ -53,10 +56,14 @@ export class SpeechDetection {
       this.mediaStreamSource.connect(this.analyser);
       
       this.isListening = true;
-      this.volumeHistory = [];
+      this.volumeBuffer = [];
+      this.baselineNoise = 0;
+      
+      // Start baseline calibration
+      setTimeout(() => this.calibrateBaseline(), 1000);
       this.detectSound();
       
-      console.log("Enhanced speech detection started - ready for all voice levels");
+      console.log("🎤 Ultra-sensitive speech detection started - detecting even whispers");
       return true;
     } catch (error) {
       console.error("Error starting speech detection:", error);
@@ -95,33 +102,44 @@ export class SpeechDetection {
     this.analyser = null;
     this.isListening = false;
     this.isSpeaking = false;
-    this.consecutiveSilenceFrames = 0;
     this.consecutiveSpeechFrames = 0;
-    this.volumeHistory = [];
+    this.volumeBuffer = [];
     console.log("Speech detection stopped");
+  }
+
+  private calibrateBaseline(): void {
+    if (this.volumeBuffer.length > 10) {
+      this.baselineNoise = Math.min(...this.volumeBuffer.slice(-10));
+      console.log(`📊 Baseline noise calibrated: ${this.baselineNoise.toFixed(2)}`);
+    }
   }
 
   private getVolumeLevel(): number {
     if (!this.analyser) return 0;
     
-    const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+    const bufferLength = this.analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
     this.analyser.getByteFrequencyData(dataArray);
     
-    // Calculate RMS (Root Mean Square) for better volume detection
+    // Calculate average volume across all frequencies
     let sum = 0;
-    for (let i = 0; i < dataArray.length; i++) {
-      sum += dataArray[i] * dataArray[i];
+    for (let i = 0; i < bufferLength; i++) {
+      sum += dataArray[i];
     }
-    const rms = Math.sqrt(sum / dataArray.length);
+    const average = sum / bufferLength;
     
-    // Focus on human voice frequency range (85Hz - 3000Hz)
-    // This roughly corresponds to indices 10-150 in our frequency data
-    const voiceRange = dataArray.slice(10, 150);
-    const voiceSum = voiceRange.reduce((acc, val) => acc + val, 0);
-    const voiceAverage = voiceSum / voiceRange.length;
+    // Focus on voice frequencies (roughly 85Hz - 3000Hz)
+    const voiceStart = Math.floor(85 * bufferLength / (this.audioContext!.sampleRate / 2));
+    const voiceEnd = Math.floor(3000 * bufferLength / (this.audioContext!.sampleRate / 2));
     
-    // Combine RMS and voice-focused detection
-    return Math.max(rms, voiceAverage);
+    let voiceSum = 0;
+    for (let i = voiceStart; i < Math.min(voiceEnd, bufferLength); i++) {
+      voiceSum += dataArray[i];
+    }
+    const voiceAverage = voiceSum / (voiceEnd - voiceStart);
+    
+    // Use the higher of general average or voice-specific average
+    return Math.max(average, voiceAverage);
   }
 
   private detectSound = (): void => {
@@ -129,33 +147,29 @@ export class SpeechDetection {
 
     const currentVolume = this.getVolumeLevel();
     
-    // Keep a rolling history of volume levels for better detection
-    this.volumeHistory.push(currentVolume);
-    if (this.volumeHistory.length > 10) {
-      this.volumeHistory.shift();
+    // Maintain a rolling buffer for baseline calculation
+    this.volumeBuffer.push(currentVolume);
+    if (this.volumeBuffer.length > 50) {
+      this.volumeBuffer.shift();
     }
     
-    // Calculate dynamic threshold based on background noise
-    const backgroundNoise = Math.min(...this.volumeHistory.slice(0, 5)) || 0;
-    const dynamicThreshold = Math.max(backgroundNoise + 5, 8); // Minimum threshold of 8
+    // Dynamic threshold based on baseline + very low threshold
+    const dynamicThreshold = Math.max(this.baselineNoise + 2, 3);
     
-    const now = Date.now();
-    
-    console.log(`Volume: ${currentVolume.toFixed(2)}, Threshold: ${dynamicThreshold.toFixed(2)}`);
+    console.log(`🔊 Volume: ${currentVolume.toFixed(2)}, Threshold: ${dynamicThreshold.toFixed(2)}, Baseline: ${this.baselineNoise.toFixed(2)}`);
     
     if (currentVolume > dynamicThreshold) {
       // Speech detected
       this.consecutiveSpeechFrames++;
-      this.consecutiveSilenceFrames = 0;
       
-      // Trigger speech detection after just 2 consecutive frames for responsiveness
-      if (this.consecutiveSpeechFrames >= 2 && !this.isSpeaking) {
+      // Trigger speech detection after just 1 frame for maximum responsiveness
+      if (this.consecutiveSpeechFrames >= 1 && !this.isSpeaking) {
         this.isSpeaking = true;
         this.onSpeechDetected();
-        console.log(`Speech STARTED - Volume: ${currentVolume.toFixed(2)}`);
+        console.log(`🎙️ SPEECH DETECTED! Volume: ${currentVolume.toFixed(2)}, Threshold: ${dynamicThreshold.toFixed(2)}`);
       }
       
-      this.lastSpeechTime = now;
+      this.lastSpeechTime = Date.now();
       
       // Clear any pending silence timeouts
       if (this.silenceTimeout) {
@@ -164,15 +178,14 @@ export class SpeechDetection {
       }
     } else {
       // Silence detected
-      this.consecutiveSilenceFrames++;
-      this.consecutiveSpeechFrames = 0;
-      
-      // End speech after consistent silence (reduced from 15 to 8 frames)
-      if (this.isSpeaking && this.consecutiveSilenceFrames >= 8) {
-        if (now - this.lastSpeechTime > 300) { // Reduced from 500ms to 300ms
+      if (this.isSpeaking && this.consecutiveSpeechFrames > 0) {
+        const now = Date.now();
+        // End speech after very short silence (200ms) for quick response
+        if (now - this.lastSpeechTime > 200) {
           this.isSpeaking = false;
+          this.consecutiveSpeechFrames = 0;
           this.onSpeechEnded();
-          console.log(`Speech ENDED after ${now - this.lastSpeechTime}ms of silence`);
+          console.log(`✅ SPEECH ENDED after ${now - this.lastSpeechTime}ms of silence`);
         }
       }
     }
