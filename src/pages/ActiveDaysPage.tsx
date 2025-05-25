@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Calendar, Flame, Target, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Calendar, Flame, Target, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getActivityData, getStreakData } from "@/utils/activityUtils";
+import { getMotivationLevel, MOTIVATION_LEVELS } from "@/utils/motivationUtils";
 
 interface ActivityData {
   [date: string]: number;
@@ -24,7 +25,6 @@ const ActiveDaysPage: React.FC = () => {
     maxStreak: 0,
     totalActiveDays: 0
   });
-  const [currentDate, setCurrentDate] = useState(new Date());
   const [hoveredDay, setHoveredDay] = useState<{date: string, count: number} | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
@@ -38,18 +38,16 @@ const ActiveDaysPage: React.FC = () => {
     loadData();
   }, []);
 
-  const getActivityLevel = (count: number): string => {
+  const getActivityColor = (count: number): string => {
     if (count === 0) return "bg-gray-200 dark:bg-gray-800";
-    if (count <= 20) return "bg-green-200 dark:bg-green-900/30";
-    if (count <= 50) return "bg-green-300 dark:bg-green-800/50";
-    if (count <= 100) return "bg-green-400 dark:bg-green-700/70";
-    return "bg-green-500 dark:bg-green-600";
+    const level = getMotivationLevel(count);
+    return level.color;
   };
 
   const generateCalendarData = () => {
     const today = new Date();
     const startDate = new Date(today);
-    startDate.setDate(today.getDate() - 364); // Last 365 days
+    startDate.setDate(today.getDate() - 364);
     
     const days = [];
     const currentDay = new Date(startDate);
@@ -141,6 +139,28 @@ const ActiveDaysPage: React.FC = () => {
         </Card>
       </div>
 
+      {/* Motivation Guide */}
+      <div className="max-w-7xl mx-auto mb-8">
+        <Card className="bg-zinc-800/50 border-amber-600/20 text-white">
+          <CardHeader>
+            <CardTitle className="text-amber-400 text-xl">Motivation Guide / प्रेरणा गाइड</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {MOTIVATION_LEVELS.map((level, index) => (
+                <div key={index} className="flex items-center gap-3 p-3 bg-zinc-900/50 rounded-lg">
+                  <div className={`w-6 h-6 rounded ${level.color}`}></div>
+                  <div>
+                    <div className="font-medium text-amber-400">{level.min === 1008 ? "1008+" : `${level.min}-${level.max}`}</div>
+                    <div className="text-sm text-gray-300">{level.description}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Calendar Grid */}
       <div className="max-w-7xl mx-auto">
         <Card className="bg-zinc-800/50 border-amber-600/20 text-white">
@@ -165,7 +185,6 @@ const ActiveDaysPage: React.FC = () => {
             <div className="flex gap-2 overflow-x-auto pb-6">
               {Array.from({ length: 53 }, (_, weekIndex) => (
                 <div key={weekIndex} className="flex flex-col gap-2">
-                  {/* Month label for first week of each month */}
                   {weekIndex === 0 || (calendarDays[weekIndex * 7] && calendarDays[weekIndex * 7].displayDate.getDate() <= 7) ? (
                     <div className="h-6 text-sm text-gray-400 mb-2 min-w-[60px]">
                       {calendarDays[weekIndex * 7] && months[calendarDays[weekIndex * 7].month]}
@@ -182,7 +201,7 @@ const ActiveDaysPage: React.FC = () => {
                       <div
                         key={dayIndex}
                         className={`w-4 h-4 rounded-sm cursor-pointer transition-all duration-200 hover:ring-2 hover:ring-amber-400 relative group ${
-                          getActivityLevel(dayData.count)
+                          getActivityColor(dayData.count)
                         } ${dayData.isToday ? 'ring-2 ring-amber-500' : ''} flex items-center justify-center`}
                         onMouseEnter={(e) => {
                           setHoveredDay({ date: dayData.date, count: dayData.count });
@@ -199,17 +218,6 @@ const ActiveDaysPage: React.FC = () => {
                   })}
                 </div>
               ))}
-            </div>
-
-            {/* Legend */}
-            <div className="flex items-center gap-3 mt-6 text-sm text-gray-400">
-              <span>Less</span>
-              <div className="w-4 h-4 bg-gray-200 dark:bg-gray-800 rounded-sm"></div>
-              <div className="w-4 h-4 bg-green-200 dark:bg-green-900/30 rounded-sm"></div>
-              <div className="w-4 h-4 bg-green-300 dark:bg-green-800/50 rounded-sm"></div>
-              <div className="w-4 h-4 bg-green-400 dark:bg-green-700/70 rounded-sm"></div>
-              <div className="w-4 h-4 bg-green-500 dark:bg-green-600 rounded-sm"></div>
-              <span>More</span>
             </div>
           </CardContent>
         </Card>
@@ -235,6 +243,11 @@ const ActiveDaysPage: React.FC = () => {
           <div className="text-amber-400">
             {hoveredDay.count} jaaps completed
           </div>
+          {hoveredDay.count > 0 && (
+            <div className="text-green-400 text-xs">
+              {getMotivationLevel(hoveredDay.count).description}
+            </div>
+          )}
         </div>
       )}
     </div>

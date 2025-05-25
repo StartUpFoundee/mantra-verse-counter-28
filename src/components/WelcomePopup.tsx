@@ -1,12 +1,11 @@
 
 import React, { useState, useEffect } from "react";
-import { getUserData } from "@/utils/spiritualIdUtils";
+import { getCurrentUserIdentity } from "@/utils/portableIdentityUtils";
 import { 
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
-  DialogClose
+  DialogTitle
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
@@ -18,19 +17,26 @@ const WelcomePopup: React.FC = () => {
   const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
-    // Load user data early to improve perceived performance
-    const userDataObj = getUserData();
-    setUserData(userDataObj);
+    // Load user data
+    const identity = getCurrentUserIdentity();
+    setUserData(identity);
     
-    // Check if we've shown the popup today already
-    const today = new Date().toDateString();
-    const lastShownDate = localStorage.getItem('welcomePopupLastShown');
-    
-    if (userDataObj) {
-      // Always show the popup on page reload regardless of last shown date
-      setIsOpen(true);
-      // Save that we've shown the popup today
-      localStorage.setItem('welcomePopupLastShown', today);
+    if (identity) {
+      // Check if this is a genuine page refresh (not navigation)
+      const navigationEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+      const isRefresh = navigationEntries.length > 0 && navigationEntries[0].type === 'reload';
+      
+      // Only show popup on actual page refresh, not on navigation
+      if (isRefresh) {
+        const today = new Date().toDateString();
+        const lastShownDate = localStorage.getItem('welcomePopupLastShown');
+        
+        // Show popup if not shown today
+        if (lastShownDate !== today) {
+          setIsOpen(true);
+          localStorage.setItem('welcomePopupLastShown', today);
+        }
+      }
     }
   }, []);
 
@@ -42,16 +48,18 @@ const WelcomePopup: React.FC = () => {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="bg-zinc-900 border-amber-600/30 text-white max-w-md mx-auto">
-        <DialogClose 
-          className="absolute right-4 top-4 rounded-full p-1.5 text-gray-400 hover:bg-amber-500/20 hover:text-amber-400"
-          onClick={handleClose}
-        >
-          <X className="h-5 w-5" />
-        </DialogClose>
-        
+      <DialogContent className="bg-zinc-900 border-amber-600/30 text-white max-w-md mx-auto">        
         <DialogHeader>
-          <div className="flex flex-col items-center text-center pt-6">
+          <div className="flex justify-end">
+            <button 
+              className="rounded-full p-1.5 text-gray-400 hover:bg-amber-500/20 hover:text-amber-400"
+              onClick={handleClose}
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          
+          <div className="flex flex-col items-center text-center">
             <div className="w-20 h-20 flex items-center justify-center rounded-full bg-amber-500/20 border-2 border-amber-500/30 mb-4">
               <span className="text-4xl">{userData.symbolImage || "🕉️"}</span>
             </div>

@@ -9,6 +9,8 @@ import ProfileHeader from "@/components/ProfileHeader";
 import WelcomePopup from "@/components/WelcomePopup";
 import ActiveDaysButton from "@/components/ActiveDaysButton";
 import { getLifetimeCount, getTodayCount } from "@/utils/indexedDBUtils";
+import { getStreakData } from "@/utils/activityUtils";
+import { calculateAchievements } from "@/utils/motivationUtils";
 import { toast } from "@/components/ui/sonner";
 
 const HomePage: React.FC = () => {
@@ -18,24 +20,28 @@ const HomePage: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [userData, setUserData] = useState<any>(null);
+  const [achievements, setAchievements] = useState<string[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        // Check if user has an identity
         const identity = getCurrentUserIdentity();
         
         if (identity) {
           setIsLoggedIn(true);
           setUserData(identity);
           
-          // Load counts from IndexedDB
           const lifetime = await getLifetimeCount();
           const today = await getTodayCount();
+          const streakData = await getStreakData();
           
           setLifetimeCount(lifetime);
           setTodayCount(today);
+          
+          // Calculate achievements
+          const userAchievements = calculateAchievements(streakData);
+          setAchievements(userAchievements);
         } else {
           setIsLoggedIn(false);
           setUserData(null);
@@ -51,7 +57,6 @@ const HomePage: React.FC = () => {
     loadData();
   }, []);
 
-  // If user is not logged in, show the welcome screen
   if (!isLoggedIn) {
     if (isLoading) {
       return (
@@ -94,7 +99,6 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-white dark:bg-zinc-900">
-      {/* Add the WelcomePopup component */}
       <WelcomePopup />
       
       <header className="py-6 text-center relative">
@@ -103,9 +107,24 @@ const HomePage: React.FC = () => {
           <ProfileHeader />
         </div>
         <h1 className="text-3xl font-bold text-amber-400">Mantra Counter</h1>
-        <p className="text-gray-300 mt-2">
-          {userData ? `Namaste, ${userData.name} Ji` : 'Count your spiritual practice with ease'}
-        </p>
+        <div className="mt-2">
+          <p className="text-gray-300">
+            {userData ? `Namaste, ${userData.name} Ji` : 'Count your spiritual practice with ease'}
+          </p>
+          {achievements.length > 0 && (
+            <div className="flex items-center justify-center gap-2 mt-2 flex-wrap">
+              <span className="text-amber-400 text-sm">Achievements:</span>
+              {achievements.map((achievement, index) => (
+                <span
+                  key={index}
+                  className="bg-gradient-to-r from-amber-500 to-amber-600 text-black px-3 py-1 rounded-full text-sm font-medium"
+                >
+                  {achievement}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </header>
       
       <main className="flex-1 flex flex-col items-center justify-center px-4 pb-12 gap-8">
@@ -163,7 +182,6 @@ const HomePage: React.FC = () => {
         </div>
       </main>
       
-      {/* Active Days Floating Button */}
       <ActiveDaysButton />
       
       <footer className="py-4 text-center text-gray-400 text-sm">
