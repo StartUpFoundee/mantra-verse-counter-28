@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,7 @@ import {
 import { Label } from "@/components/ui/label";
 import SpiritualIconSelector from "@/components/SpiritualIconSelector";
 import QRCodeModal from "@/components/QRCodeModal";
+import QRCodeBackupPanel from "@/components/QRCodeBackupPanel";
 
 const SpiritualIdPage: React.FC = () => {
   const navigate = useNavigate();
@@ -32,6 +32,7 @@ const SpiritualIdPage: React.FC = () => {
   const [selectedIcon, setSelectedIcon] = useState<string>("om");
   const [qrModalOpen, setQrModalOpen] = useState<boolean>(false);
   const [showLoginOptions, setShowLoginOptions] = useState<boolean>(false);
+  const [showQRBackupPanel, setShowQRBackupPanel] = useState<boolean>(false);
 
   useEffect(() => {
     // Check if user already has a spiritual ID stored
@@ -304,7 +305,7 @@ const SpiritualIdPage: React.FC = () => {
                 <div className="text-6xl mb-2">🕉️</div>
                 <h2 className="text-2xl font-bold text-amber-400 mb-3">Welcome, Spiritual Seeker</h2>
                 <p className="text-gray-300 mb-1">Please enter your details to start your spiritual journey</p>
-                <p className="text-amber-300 text-sm">कृपया अपनी आध्यात्मिक यात्रा शुरू करने के लिए अपना विवरण दर्ज करें</p>
+                <p className="text-amber-300 text-sm">कृपया अपना विवरण दर्ज करें जिससे आपकी आध्यात्मिक यात्रा शुरू करने के लिए</p>
               </div>
               
               <div className="flex flex-col items-center gap-4">
@@ -457,6 +458,12 @@ const SpiritualIdPage: React.FC = () => {
         />
       )}
       
+      {/* QR Code Backup Panel */}
+      <QRCodeBackupPanel 
+        isOpen={showQRBackupPanel} 
+        onOpenChange={setShowQRBackupPanel} 
+      />
+      
       {/* Main content */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 pb-12">
         <div className="bg-zinc-800/80 border border-zinc-700 rounded-lg p-6 mb-8 w-full max-w-md">
@@ -487,15 +494,25 @@ const SpiritualIdPage: React.FC = () => {
           <span>Logout / लॉग आउट करें</span>
         </Button>
         
-        {/* Sharing options */}
+        {/* Enhanced sharing options */}
         <div className="bg-zinc-800/80 border border-zinc-700 rounded-lg p-6 w-full max-w-md">
           <h3 className="text-lg font-medium text-amber-400 mb-4 text-center">
-            Share Your Spiritual ID
+            Backup & Share Your Identity
             <br />
-            <span className="text-sm font-normal text-gray-300">अपना आध्यात्मिक आईडी साझा करें</span>
+            <span className="text-sm font-normal text-gray-300">अपनी पहचान का बैकअप और साझाकरण</span>
           </h3>
           
           <div className="grid grid-cols-2 gap-4">
+            <Button 
+              variant="outline" 
+              className="bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 flex flex-col items-center py-6"
+              onClick={() => setShowQRBackupPanel(true)}
+            >
+              <QrCode className="h-6 w-6 mb-2" />
+              <span>QR & Backup</span>
+              <span className="text-xs text-gray-400">क्यूआर व बैकअप</span>
+            </Button>
+            
             <Button 
               variant="outline" 
               className="bg-zinc-800 hover:bg-zinc-700 text-amber-400 border border-zinc-700 flex flex-col items-center py-6"

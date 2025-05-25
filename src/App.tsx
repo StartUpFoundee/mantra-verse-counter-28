@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +12,7 @@ import IdentityGuidePage from "./pages/IdentityGuidePage";
 import ActiveDaysPage from "./pages/ActiveDaysPage";
 import NotFound from "./pages/NotFound";
 import { initializeDatabase } from "./utils/indexedDBUtils";
+import { initializeBackupScheduler } from "./utils/backupScheduler";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +21,9 @@ const App = () => {
   useEffect(() => {
     const init = async () => {
       await initializeDatabase();
+      
+      // Initialize backup scheduler
+      initializeBackupScheduler();
     };
     init();
   }, []);
