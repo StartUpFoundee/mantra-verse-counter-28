@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SpiritualIconSelector from "./SpiritualIconSelector";
-import EmailBackupConsent from "./EmailBackupConsent";
 import IdentityRestore from "./IdentityRestore";
 import { toast } from "@/components/ui/sonner";
 import { 
@@ -28,10 +27,8 @@ const WelcomeScreen: React.FC = () => {
   
   // UI states
   const [activeTab, setActiveTab] = useState<"create" | "restore">("create");
-  const [showEmailConsent, setShowEmailConsent] = useState(false);
   const [showRestore, setShowRestore] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
-  const [pendingIdentity, setPendingIdentity] = useState<any>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -73,51 +70,30 @@ const WelcomeScreen: React.FC = () => {
     }
 
     try {
-      // Create the user identity
+      // Create the user identity with backup disabled by default
       const identity = await createUserIdentity(name.trim(), dob, email.trim(), selectedIcon);
       
-      // Save the pending identity for after consent
-      setPendingIdentity(identity);
-      
-      // Show email backup consent
-      setShowEmailConsent(true);
-      
-    } catch (error) {
-      console.error("Identity creation failed:", error);
-      toast("Creation Failed", {
-        description: "Unable to create identity. Please try again."
-      });
-    }
-  };
-
-  const handleEmailConsent = async (finalEmail: string, enabled: boolean) => {
-    if (!pendingIdentity) return;
-    
-    try {
-      // Update the identity with final email and backup preference
+      // Set backup preferences to false by default
       const finalIdentity = {
-        ...pendingIdentity,
-        email: finalEmail,
-        emailBackupEnabled: enabled
+        ...identity,
+        emailBackupEnabled: false,
+        googleDriveEnabled: false
       };
       
       // Save the identity to storage
       await saveUserIdentity(finalIdentity);
       
       toast("Identity Created Successfully", {
-        description: `Welcome ${finalIdentity.name}! Your unique ID: ${finalIdentity.uniqueId}`
+        description: `Welcome ${finalIdentity.name}! You can enable backup in your profile settings.`
       });
-      
-      // Hide consent modal
-      setShowEmailConsent(false);
       
       // Navigate to homepage
       navigate("/");
       
     } catch (error) {
-      console.error("Failed to save identity:", error);
-      toast("Save Failed", {
-        description: "Unable to save identity. Please try again."
+      console.error("Identity creation failed:", error);
+      toast("Creation Failed", {
+        description: "Unable to create identity. Please try again."
       });
     }
   };
@@ -156,15 +132,6 @@ const WelcomeScreen: React.FC = () => {
 
   return (
     <div className="w-full max-w-md mx-auto p-6 bg-zinc-800/50 border border-zinc-700 rounded-xl">
-      {/* Email Backup Consent Modal */}
-      {showEmailConsent && pendingIdentity && (
-        <EmailBackupConsent
-          userEmail={pendingIdentity.email}
-          onConsent={handleEmailConsent}
-          onSkip={() => handleEmailConsent(pendingIdentity.email, false)}
-        />
-      )}
-      
       <h1 className="text-2xl font-bold text-amber-400 text-center mb-6">
         Welcome to Mantra Counter
       </h1>
@@ -262,7 +229,7 @@ const WelcomeScreen: React.FC = () => {
       
       <div className="mt-6 pt-4 border-t border-zinc-700">
         <p className="text-xs text-center text-gray-400">
-          Your identity is stored securely and can be backed up to email/Google Drive
+          Your identity is stored securely. Backup options available in profile settings.
         </p>
       </div>
     </div>

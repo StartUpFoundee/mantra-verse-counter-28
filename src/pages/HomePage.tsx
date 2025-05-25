@@ -10,7 +10,8 @@ import WelcomePopup from "@/components/WelcomePopup";
 import ActiveDaysButton from "@/components/ActiveDaysButton";
 import { getLifetimeCount, getTodayCount } from "@/utils/indexedDBUtils";
 import { getStreakData } from "@/utils/activityUtils";
-import { calculateAchievements } from "@/utils/motivationUtils";
+import { getAchievementsForProfile } from "@/utils/motivationUtils";
+import { initializeBackupScheduler } from "@/utils/backupScheduler";
 import { toast } from "@/components/ui/sonner";
 
 const HomePage: React.FC = () => {
@@ -20,7 +21,7 @@ const HomePage: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [userData, setUserData] = useState<any>(null);
-  const [achievements, setAchievements] = useState<string[]>([]);
+  const [achievements, setAchievements] = useState<any[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -39,9 +40,14 @@ const HomePage: React.FC = () => {
           setLifetimeCount(lifetime);
           setTodayCount(today);
           
-          // Calculate achievements
-          const userAchievements = calculateAchievements(streakData);
+          // Calculate achievements - only show for streaks 5+ days
+          const userAchievements = getAchievementsForProfile(streakData);
           setAchievements(userAchievements);
+          
+          // Initialize backup scheduler if Google Drive is enabled
+          if (identity.googleDriveEnabled) {
+            initializeBackupScheduler();
+          }
         } else {
           setIsLoggedIn(false);
           setUserData(null);
@@ -119,7 +125,7 @@ const HomePage: React.FC = () => {
                   key={index}
                   className="bg-gradient-to-r from-amber-500 to-amber-600 text-black px-3 py-1 rounded-full text-sm font-medium"
                 >
-                  {achievement}
+                  {achievement.icon} {achievement.name}
                 </span>
               ))}
             </div>

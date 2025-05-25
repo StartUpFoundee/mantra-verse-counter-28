@@ -10,7 +10,7 @@ export interface BackupSchedule {
   enabled: boolean;
   lastBackupDate: string | null;
   nextBackupDate: string | null;
-  autorized: boolean;
+  authorized: boolean;
 }
 
 /**
@@ -62,7 +62,7 @@ export const performScheduledBackup = async (): Promise<boolean> => {
   }
   
   const identity = getCurrentUserIdentity();
-  if (!identity || !identity.emailBackupEnabled) {
+  if (!identity || !identity.googleDriveEnabled) {
     return false;
   }
   
@@ -114,10 +114,10 @@ export const getBackupScheduleStatus = async (): Promise<BackupSchedule> => {
   const nextBackupDate = getNextBackupDate();
   
   return {
-    enabled: identity?.emailBackupEnabled || false,
+    enabled: identity?.googleDriveEnabled || false,
     lastBackupDate,
     nextBackupDate: nextBackupDate.toISOString(),
-    autorized: googleDriveService.isUserAuthorized()
+    authorized: googleDriveService.isUserAuthorized()
   };
 };
 
