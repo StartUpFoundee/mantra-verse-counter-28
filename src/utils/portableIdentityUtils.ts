@@ -1,5 +1,6 @@
+
 import { generateUniqueId, encodeUserData, decodeUserData } from './identityCore';
-import { getUserData as getDBUserData, saveUserData as saveDBUserData, logoutUser as logoutDBUser } from './indexedDBUtils';
+import { getUserData, saveUserData, logoutUser } from './indexedDBUtils';
 
 export interface UserIdentity {
   uniqueId: string;
@@ -42,26 +43,51 @@ export const createUserIdentity = async (name: string, dob: string, email: strin
  * Saves user identity to storage
  */
 export const saveUserIdentity = async (identity: UserIdentity): Promise<void> => {
-  // Encode user data for security
-  const encodedData = encodeUserData(identity);
+  // Convert to format compatible with existing system
+  const userData = {
+    id: identity.uniqueId,
+    name: identity.name,
+    dob: identity.dob,
+    email: identity.email,
+    symbol: identity.symbol,
+    symbolImage: identity.symbolImage,
+    createdAt: identity.createdAt,
+    lastLogin: new Date().toISOString(),
+    emailBackupEnabled: identity.emailBackupEnabled,
+    googleDriveEnabled: identity.googleDriveEnabled,
+    lastBackup: identity.lastBackup,
+    chantingStats: identity.chantingStats || {}
+  };
   
   // Save to IndexedDB
-  await saveDBUserData(encodedData);
+  await saveUserData(userData);
 };
 
 /**
  * Gets the current user identity from storage
  */
-export const getCurrentUserIdentity = (): any => {
-  // Get encoded user data from IndexedDB
-  const encodedData = getDBUserData();
+export const getCurrentUserIdentity = (): UserIdentity | null => {
+  // Get user data from IndexedDB (synchronous fallback)
+  const userData = localStorage.getItem('chantTrackerUserData');
   
-  if (!encodedData) return null;
+  if (!userData) return null;
   
   // Decode user data
   try {
-    const identity = decodeUserData(encodedData);
-    return identity;
+    const parsed = JSON.parse(userData);
+    return {
+      uniqueId: parsed.id || parsed.uniqueId,
+      name: parsed.name,
+      dob: parsed.dob,
+      email: parsed.email,
+      createdAt: parsed.createdAt,
+      lastBackup: parsed.lastBackup,
+      emailBackupEnabled: parsed.emailBackupEnabled || false,
+      googleDriveEnabled: parsed.googleDriveEnabled || false,
+      symbol: parsed.symbol,
+      symbolImage: parsed.symbolImage,
+      chantingStats: parsed.chantingStats || {}
+    };
   } catch (error) {
     console.error('Failed to decode user identity:', error);
     return null;
@@ -72,7 +98,7 @@ export const getCurrentUserIdentity = (): any => {
  * Logs out the current user by clearing storage
  */
 export const logoutCurrentUser = async (): Promise<void> => {
-  await logoutDBUser();
+  await logoutUser();
 };
 
 /**

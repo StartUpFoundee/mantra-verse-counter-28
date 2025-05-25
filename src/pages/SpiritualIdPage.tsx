@@ -458,10 +458,10 @@ const SpiritualIdPage: React.FC = () => {
         />
       )}
       
-      {/* QR Code Backup Panel */}
+      {/* QR Code Backup Panel - Fix the props */}
       <QRCodeBackupPanel 
         isOpen={showQRBackupPanel} 
-        onOpenChange={setShowQRBackupPanel} 
+        onClose={() => setShowQRBackupPanel(false)}
       />
       
       {/* Main content */}
