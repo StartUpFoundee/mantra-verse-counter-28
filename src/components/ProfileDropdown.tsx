@@ -1,8 +1,8 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getUserData, logoutUser } from "@/utils/spiritualIdUtils";
-import { UserRound, Copy, Download, LogOut } from "lucide-react";
+import { getCurrentUserIdentity, logoutUser } from "@/utils/portableIdentityUtils";
+import { UserRound, Copy, Download, LogOut, QrCode } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 interface ProfileDropdownProps {
@@ -24,28 +24,28 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
 
     document.addEventListener("mousedown", handleClickOutside);
 
-    // Get user data
-    const currentUserData = getUserData();
-    setUserData(currentUserData);
+    // Get user identity from the new system
+    const identity = getCurrentUserIdentity();
+    setUserData(identity);
     
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [onClose]);
 
-  const handleLogout = () => {
-    logoutUser();
+  const handleLogout = async () => {
+    await logoutUser();
     onClose();
-    navigate("/spiritual-id"); // Take user to spiritual-id page after logout
+    navigate("/"); // Navigate to homepage, which will show welcome screen
   };
 
   const handleCopyId = () => {
-    if (!userData?.id) return;
+    if (!userData?.uniqueId) return;
     
-    navigator.clipboard.writeText(userData.id)
+    navigator.clipboard.writeText(userData.uniqueId)
       .then(() => {
-        toast("ID Copied", {
-          description: "Your spiritual ID has been copied to clipboard"
+        toast("Unique ID Copied", {
+          description: "Your unique spiritual ID has been copied to clipboard"
         });
       })
       .catch(err => {
@@ -61,7 +61,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
     const dataStr = JSON.stringify(userData, null, 2);
     const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
     
-    const exportFileDefaultName = `spiritual-identity-${userData.id}.json`;
+    const exportFileDefaultName = `spiritual-identity-${userData.uniqueId}.json`;
     
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
@@ -73,6 +73,11 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
     });
     
     onClose();
+  };
+
+  const handleViewProfile = () => {
+    onClose();
+    navigate('/spiritual-id');
   };
 
   const toggleIdCopy = () => {
@@ -88,14 +93,24 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
     >
       <div className="px-4 py-3 border-b border-zinc-700">
         <p className="text-sm font-medium text-amber-400">{userData.name}</p>
-        <p className="text-xs text-gray-400 mt-1">ID: {userData.id}</p>
+        <p className="text-xs text-gray-400 mt-1">ID: {userData.uniqueId}</p>
+        <p className="text-xs text-gray-500 mt-1">{userData.email}</p>
       </div>
       
       <ul>
         <li>
+          <button 
+            className="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-zinc-700"
+            onClick={handleViewProfile}
+          >
+            <QrCode size={16} className="mr-2 text-gray-400" />
+            View Profile & QR
+          </button>
+        </li>
+        <li>
           {showIdCopy ? (
             <div className="px-4 py-2 flex items-center justify-between">
-              <p className="text-sm text-amber-400 truncate">{userData?.id}</p>
+              <p className="text-sm text-amber-400 truncate">{userData?.uniqueId}</p>
               <button 
                 className="ml-2 p-1 rounded-full hover:bg-zinc-700"
                 onClick={handleCopyId}
@@ -109,7 +124,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
               onClick={toggleIdCopy}
             >
               <UserRound size={16} className="mr-2 text-gray-400" />
-              View ID
+              Copy Unique ID
             </button>
           )}
         </li>
@@ -119,7 +134,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
             onClick={handleExportIdentity}
           >
             <Download size={16} className="mr-2 text-gray-400" />
-            Save Identity
+            Export Identity
           </button>
         </li>
         <li className="border-t border-zinc-700 mt-1">

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { getUserData } from "@/utils/spiritualIdUtils";
+import { getCurrentUserIdentity } from "@/utils/portableIdentityUtils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import ProfileDropdown from "./ProfileDropdown";
@@ -10,10 +10,10 @@ const ProfileHeader: React.FC = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   
   useEffect(() => {
-    // Get user data from localStorage for immediate UI update
-    const localUserData = getUserData();
-    if (localUserData) {
-      setUserData(localUserData);
+    // Get user identity from the new system
+    const identity = getCurrentUserIdentity();
+    if (identity) {
+      setUserData(identity);
     }
   }, []);
 

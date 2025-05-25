@@ -1,7 +1,8 @@
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mic, Hand, Infinity, Clock } from "lucide-react";
-import { isUserLoggedIn, getUserData } from "@/utils/spiritualIdUtils";
+import { getCurrentUserIdentity } from "@/utils/portableIdentityUtils";
 import ThemeToggle from "@/components/ThemeToggle";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import ProfileHeader from "@/components/ProfileHeader";
@@ -16,23 +17,28 @@ const HomePage: React.FC = () => {
   const [todayCount, setTodayCount] = useState<number>(0);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isMigrating, setIsMigrating] = useState<boolean>(false);
+  const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        // Check if user is logged in
-        const loggedIn = isUserLoggedIn();
-        setIsLoggedIn(loggedIn);
+        // Check if user has an identity
+        const identity = getCurrentUserIdentity();
         
-        // If logged in, load counts from IndexedDB
-        if (loggedIn) {
+        if (identity) {
+          setIsLoggedIn(true);
+          setUserData(identity);
+          
+          // Load counts from IndexedDB
           const lifetime = await getLifetimeCount();
           const today = await getTodayCount();
           
           setLifetimeCount(lifetime);
           setTodayCount(today);
+        } else {
+          setIsLoggedIn(false);
+          setUserData(null);
         }
       } catch (error) {
         console.error("Error loading data:", error);
@@ -47,12 +53,10 @@ const HomePage: React.FC = () => {
 
   // If user is not logged in, show the welcome screen
   if (!isLoggedIn) {
-    if (isLoading || isMigrating) {
+    if (isLoading) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white dark:bg-zinc-900">
-          <div className="mb-4 text-amber-400 text-lg">
-            {isMigrating ? "Upgrading your spiritual journey..." : "Loading..."}
-          </div>
+          <div className="mb-4 text-amber-400 text-lg">Loading...</div>
           <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
         </div>
       );
@@ -78,9 +82,6 @@ const HomePage: React.FC = () => {
       </div>
     );
   }
-
-  // Get user data
-  const userData = getUserData();
 
   if (isLoading) {
     return (

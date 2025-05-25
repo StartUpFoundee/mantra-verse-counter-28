@@ -1,58 +1,147 @@
 
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { 
-  generateUserID, 
-  spiritualIcons, 
-  saveUserData, 
-  validateUserID, 
-  correctUserID,
-  findIDsByDOB,
-  extractDOBFromID
-} from "@/utils/spiritualIdUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import SpiritualIconSelector from "./SpiritualIconSelector";
-import { toast } from "@/components/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import SpiritualIconSelector from "./SpiritualIconSelector";
+import EmailBackupConsent from "./EmailBackupConsent";
+import IdentityRestore from "./IdentityRestore";
+import { toast } from "@/components/ui/sonner";
+import { 
+  createUserIdentity, 
+  saveUserIdentity, 
+  getCurrentUserIdentity,
+  updateEmailBackupPreference,
+  validateEmail 
+} from "@/utils/portableIdentityUtils";
 import { initializeDatabase, migrateFromLocalStorage } from "@/utils/indexedDBUtils";
+import { initializeEmailJS } from "@/utils/emailService";
+import { initializeActivityMonitor } from "@/utils/activityMonitor";
+import { triggerBackupIfEnabled } from "@/utils/portableIdentityUtils";
 
 const WelcomeScreen: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Form states
   const [name, setName] = useState("");
   const [dob, setDob] = useState("");
+  const [email, setEmail] = useState("");
   const [selectedIcon, setSelectedIcon] = useState("om");
-  const [activeTab, setActiveTab] = useState<"create" | "login" | "recover">("create");
-  const [existingId, setExistingId] = useState("");
-  const [recoveryDob, setRecoveryDob] = useState("");
-  const [recoveredIds, setRecoveredIds] = useState<string[]>([]);
-  const [isRecoverySearched, setIsRecoverySearched] = useState(false);
+  
+  // UI states
+  const [activeTab, setActiveTab] = useState<"create" | "restore">("create");
+  const [showEmailConsent, setShowEmailConsent] = useState(false);
+  const [showRestore, setShowRestore] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [pendingIdentity, setPendingIdentity] = useState<any>(null);
 
   useEffect(() => {
-    // Initialize database and migrate data if needed
     const init = async () => {
       setIsMigrating(true);
+      
+      // Initialize systems
       await initializeDatabase();
       const migrationSuccess = await migrateFromLocalStorage();
+      
       if (migrationSuccess) {
         console.log("Data migration successful");
       }
+      
+      // Initialize EmailJS
+      initializeEmailJS();
+      
+      // Check if user wants to restore from URL
+      const params = new URLSearchParams(location.search);
+      if (params.get('restore') === 'true') {
+        setShowRestore(true);
+      }
+      
+      // Initialize activity monitoring
+      initializeActivityMonitor(() => {
+        triggerBackupIfEnabled().catch(console.error);
+      });
+      
       setIsMigrating(false);
     };
+    
     init();
-    
-    // Check URL for ID parameter (for QR code logins)
-    const params = new URLSearchParams(location.search);
-    const idParam = params.get('id');
-    
-    if (idParam) {
-      setExistingId(idParam);
-      setActiveTab("login");
-    }
   }, [location]);
+
+  const handleCreateIdentity = async () => {
+    if (!name.trim() || !dob || !email.trim()) {
+      toast("Missing Information", {
+        description: "Please fill all required fields"
+      });
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      toast("Invalid Email", {
+        description: "Please enter a valid email address"
+      });
+      return;
+    }
+
+    try {
+      // Create the user identity
+      const identity = await createUserIdentity(name.trim(), dob, email.trim(), selectedIcon);
+      
+      // Save the pending identity for after consent
+      setPendingIdentity(identity);
+      
+      // Show email backup consent
+      setShowEmailConsent(true);
+      
+    } catch (error) {
+      console.error("Identity creation failed:", error);
+      toast("Creation Failed", {
+        description: "Unable to create identity. Please try again."
+      });
+    }
+  };
+
+  const handleEmailConsent = async (finalEmail: string, enabled: boolean) => {
+    if (!pendingIdentity) return;
+    
+    try {
+      // Update the identity with final email and backup preference
+      const finalIdentity = {
+        ...pendingIdentity,
+        email: finalEmail,
+        emailBackupEnabled: enabled
+      };
+      
+      // Save the identity to storage
+      await saveUserIdentity(finalIdentity);
+      
+      toast("Identity Created Successfully", {
+        description: `Welcome ${finalIdentity.name}! Your unique ID: ${finalIdentity.uniqueId}`
+      });
+      
+      // Hide consent modal
+      setShowEmailConsent(false);
+      
+      // Navigate to homepage
+      navigate("/");
+      
+    } catch (error) {
+      console.error("Failed to save identity:", error);
+      toast("Save Failed", {
+        description: "Unable to save identity. Please try again."
+      });
+    }
+  };
+
+  const handleRestoreComplete = () => {
+    setShowRestore(false);
+    toast("Identity Restored", {
+      description: "Welcome back! Your spiritual journey continues."
+    });
+    navigate("/");
+  };
 
   if (isMigrating) {
     return (
@@ -65,128 +154,42 @@ const WelcomeScreen: React.FC = () => {
     );
   }
 
-  const handleCreateIdentity = () => {
-    if (!name || !dob || !selectedIcon) {
-      toast("Missing information", {
-        description: "Please fill all required fields",
-      });
-      return;
-    }
-
-    // Generate unique ID based on DOB
-    const userID = generateUserID(dob);
-
-    // Get selected icon
-    const iconObj = spiritualIcons.find(icon => icon.id === selectedIcon);
-
-    // Create user data object
-    const userData = {
-      id: userID,
-      name: name,
-      dob: dob,
-      symbol: selectedIcon,
-      symbolImage: iconObj?.symbol || "🕉️",
-      createdAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString(),
-      chantingStats: {}
-    };
-
-    // Save to localStorage
-    saveUserData(userData);
-
-    // Show success message
-    toast("Identity Created", {
-      description: `Your spiritual ID is ${userID}. Please remember it.`,
-    });
-
-    // Redirect to homepage
-    navigate("/");
-  };
-
-  const handleExistingIdLogin = () => {
-    if (!existingId) {
-      toast("Missing ID", {
-        description: "Please enter your spiritual ID",
-      });
-      return;
-    }
-
-    // Correct common mistakes in ID format
-    const correctedId = correctUserID(existingId);
-    
-    // Validate ID format
-    if (!validateUserID(correctedId)) {
-      toast("Invalid ID Format", {
-        description: "Please enter a valid spiritual ID (format: DDMMYYYY_XXXX)",
-      });
-      return;
-    }
-
-    // Create a basic user object from the ID
-    const dob = extractDOBFromID(correctedId);
-    const iconObj = spiritualIcons.find(icon => icon.id === selectedIcon);
-    
-    const userData = {
-      id: correctedId,
-      name: name || "Spiritual Seeker", // Use entered name or default
-      dob: dob,
-      symbol: selectedIcon,
-      symbolImage: iconObj?.symbol || "🕉️",
-      lastLogin: new Date().toISOString(),
-    };
-
-    saveUserData(userData);
-    navigate("/");
-  };
-
-  const handleRecoverySearch = () => {
-    if (!recoveryDob) {
-      toast("Date Required", {
-        description: "Please enter your date of birth",
-      });
-      return;
-    }
-
-    // Search for IDs matching this DOB
-    const foundIds = findIDsByDOB(recoveryDob);
-    setRecoveredIds(foundIds);
-    setIsRecoverySearched(true);
-    
-    if (foundIds.length === 0) {
-      toast("No IDs Found", {
-        description: "No spiritual IDs found matching this date of birth",
-      });
-    }
-  };
-
-  const handleSelectRecoveredId = (id: string) => {
-    setExistingId(id);
-    setActiveTab("login");
-    
-    toast("ID Selected", {
-      description: "You can now log in with this spiritual ID",
-    });
-  };
-
-  const handleContinueAsGuest = () => {
-    navigate("/");
-  };
+  if (showRestore) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-black">
+        <IdentityRestore
+          onRestoreComplete={handleRestoreComplete}
+          onCancel={() => {
+            setShowRestore(false);
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-md mx-auto p-6 bg-zinc-800/50 border border-zinc-700 rounded-xl">
+      {/* Email Backup Consent Modal */}
+      {showEmailConsent && pendingIdentity && (
+        <EmailBackupConsent
+          userEmail={pendingIdentity.email}
+          onConsent={handleEmailConsent}
+          onSkip={() => handleEmailConsent(pendingIdentity.email, false)}
+        />
+      )}
+      
       <h1 className="text-2xl font-bold text-amber-400 text-center mb-6">
         Welcome to Mantra Counter
       </h1>
       
       <Tabs 
         value={activeTab} 
-        onValueChange={(value) => setActiveTab(value as "create" | "login" | "recover")}
+        onValueChange={(value) => setActiveTab(value as "create" | "restore")}
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="create">Create Identity</TabsTrigger>
-          <TabsTrigger value="login">Login</TabsTrigger>
-          <TabsTrigger value="recover">Recover ID</TabsTrigger>
+          <TabsTrigger value="restore">Restore Identity</TabsTrigger>
         </TabsList>
         
         <TabsContent value="create" className="mt-6 space-y-4">
@@ -197,7 +200,7 @@ const WelcomeScreen: React.FC = () => {
               </Label>
               <Input
                 id="name"
-                placeholder="Enter your name"
+                placeholder="Enter your full name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="bg-zinc-900 border-zinc-700"
@@ -213,6 +216,20 @@ const WelcomeScreen: React.FC = () => {
                 type="date"
                 value={dob}
                 onChange={(e) => setDob(e.target.value)}
+                className="bg-zinc-900 border-zinc-700"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-amber-400">
+                Email Address / ईमेल पता
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="your.email@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="bg-zinc-900 border-zinc-700"
               />
             </div>
@@ -233,7 +250,7 @@ const WelcomeScreen: React.FC = () => {
             
             <Button
               variant="ghost"
-              onClick={handleContinueAsGuest}
+              onClick={() => navigate("/")}
               className="text-gray-400 hover:text-gray-300 hover:bg-zinc-800"
             >
               Continue as Guest
@@ -241,146 +258,24 @@ const WelcomeScreen: React.FC = () => {
           </div>
         </TabsContent>
         
-        <TabsContent value="login" className="mt-6 space-y-4">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="existingId" className="text-amber-400">
-                Your Spiritual ID / आपका आध्यात्मिक आईडी
-              </Label>
-              <Input
-                id="existingId"
-                placeholder="Enter your ID (e.g., 01012000_1234)"
-                value={existingId}
-                onChange={(e) => setExistingId(e.target.value)}
-                className="bg-zinc-900 border-zinc-700"
-              />
-              <p className="text-xs text-gray-400">
-                Format: DDMMYYYY_XXXX (based on your date of birth)
-              </p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="name-login" className="text-amber-400">
-                Your Name (Optional) / आपका नाम
-              </Label>
-              <Input
-                id="name-login"
-                placeholder="Enter your name (optional)"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="bg-zinc-900 border-zinc-700"
-              />
-            </div>
-            
-            <SpiritualIconSelector 
-              selectedIcon={selectedIcon}
-              onSelectIcon={setSelectedIcon}
-            />
-          </div>
-          
-          <div className="flex flex-col gap-3 pt-4">
+        <TabsContent value="restore" className="mt-6 space-y-4">
+          <div className="text-center py-8">
             <Button
-              onClick={handleExistingIdLogin}
+              onClick={() => setShowRestore(true)}
               className="bg-amber-600 hover:bg-amber-700 text-white"
             >
-              Continue Your Journey
+              Restore Your Identity
             </Button>
-            
-            <Button
-              variant="ghost"
-              onClick={handleContinueAsGuest}
-              className="text-gray-400 hover:text-gray-300 hover:bg-zinc-800"
-            >
-              Continue as Guest
-            </Button>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="recover" className="mt-6 space-y-4">
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="recovery-dob" className="text-amber-400 mb-2 block">
-                Enter Your Date of Birth / अपनी जन्म तिथि दर्ज करें
-              </Label>
-              <Input
-                id="recovery-dob"
-                type="date"
-                value={recoveryDob}
-                onChange={(e) => setRecoveryDob(e.target.value)}
-                className="bg-zinc-900 border-zinc-700"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                We'll find IDs associated with this birth date
-              </p>
-            </div>
-            
-            <Button
-              onClick={handleRecoverySearch}
-              className="w-full bg-zinc-700 hover:bg-zinc-600 text-white"
-            >
-              Search for My ID
-            </Button>
-            
-            {isRecoverySearched && (
-              <div className="mt-4">
-                <Label className="text-amber-400 mb-2 block">
-                  {recoveredIds.length > 0 ? "Found IDs" : "No IDs Found"}
-                </Label>
-                
-                {recoveredIds.length > 0 ? (
-                  <div className="space-y-2">
-                    {recoveredIds.map((id) => (
-                      <div 
-                        key={id} 
-                        className="p-3 bg-zinc-700 border border-zinc-600 rounded-md cursor-pointer hover:bg-zinc-600"
-                        onClick={() => handleSelectRecoveredId(id)}
-                      >
-                        <p className="font-medium text-amber-400">{id}</p>
-                        <p className="text-xs text-gray-300 mt-1">Click to select this ID</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-4 bg-zinc-700 border border-zinc-600 rounded-md">
-                    <p className="text-gray-300">No spiritual IDs found matching this date of birth.</p>
-                    <p className="text-sm text-gray-400 mt-2">
-                      You may need to create a new identity or try another date.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          
-          <div className="flex flex-col gap-3 pt-4 mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setActiveTab("create")}
-              className="border-zinc-700 text-gray-300 hover:bg-zinc-700"
-            >
-              Create New Identity
-            </Button>
-            
-            <Button
-              variant="ghost"
-              onClick={handleContinueAsGuest}
-              className="text-gray-400 hover:text-gray-300 hover:bg-zinc-800"
-            >
-              Continue as Guest
-            </Button>
+            <p className="text-sm text-gray-400 mt-2">
+              Use your backup data to restore your spiritual journey
+            </p>
           </div>
         </TabsContent>
       </Tabs>
       
       <div className="mt-6 pt-4 border-t border-zinc-700">
         <p className="text-xs text-center text-gray-400">
-          Your identity is stored locally on your device. <br/>
-          <button 
-            className="text-amber-400 hover:underline"
-            onClick={() => navigate('/identity-guide')}
-          >
-            Learn more about identity management
-          </button>
+          Your identity is stored securely and can be backed up to email/Google Drive
         </p>
       </div>
     </div>
