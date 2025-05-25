@@ -564,7 +564,6 @@ const SpiritualIdPage: React.FC = () => {
             <Switch 
               checked={googleDriveEnabled}
               onCheckedChange={handleGoogleDriveToggle}
-              size="sm"
             />
           </div>
         </div>
