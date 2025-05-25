@@ -12,14 +12,9 @@ import { toast } from "@/components/ui/sonner";
 import { 
   createUserIdentity, 
   saveUserIdentity, 
-  getCurrentUserIdentity,
-  updateEmailBackupPreference,
   validateEmail 
 } from "@/utils/portableIdentityUtils";
 import { initializeDatabase, migrateFromLocalStorage } from "@/utils/indexedDBUtils";
-import { initializeEmailJS } from "@/utils/emailService";
-import { initializeActivityMonitor } from "@/utils/activityMonitor";
-import { triggerBackupIfEnabled } from "@/utils/portableIdentityUtils";
 
 const WelcomeScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -50,19 +45,11 @@ const WelcomeScreen: React.FC = () => {
         console.log("Data migration successful");
       }
       
-      // Initialize EmailJS
-      initializeEmailJS();
-      
       // Check if user wants to restore from URL
       const params = new URLSearchParams(location.search);
       if (params.get('restore') === 'true') {
         setShowRestore(true);
       }
-      
-      // Initialize activity monitoring
-      initializeActivityMonitor(() => {
-        triggerBackupIfEnabled().catch(console.error);
-      });
       
       setIsMigrating(false);
     };

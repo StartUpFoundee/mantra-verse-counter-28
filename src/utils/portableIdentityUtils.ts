@@ -17,6 +17,14 @@ export interface UserIdentity {
 }
 
 /**
+ * Validates email format
+ */
+export const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+/**
  * Creates a new user identity with enhanced unique ID generation
  */
 export const createUserIdentity = async (name: string, dob: string, email: string, symbol: string = "om"): Promise<UserIdentity> => {
@@ -146,6 +154,14 @@ export const recoverUserIdentity = async (data: string): Promise<UserIdentity | 
   }
 };
 
+/**
+ * Placeholder for backup trigger - simplified for now
+ */
+export const triggerBackupIfEnabled = async (): Promise<void> => {
+  // This would trigger backup logic when implemented
+  console.log('Backup check triggered');
+};
+
 export default {
   createUserIdentity,
   saveUserIdentity,
@@ -153,5 +169,7 @@ export default {
   logoutCurrentUser,
   updateEmailBackupPreference,
   updateGoogleDrivePreference,
-  recoverUserIdentity
+  recoverUserIdentity,
+  validateEmail,
+  triggerBackupIfEnabled
 };

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getCurrentUserIdentity, logoutUser } from "@/utils/portableIdentityUtils";
+import { getCurrentUserIdentity, logoutCurrentUser } from "@/utils/portableIdentityUtils";
 import { UserRound, Copy, Download, LogOut, QrCode } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
@@ -34,7 +34,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
   }, [onClose]);
 
   const handleLogout = async () => {
-    await logoutUser();
+    await logoutCurrentUser();
     onClose();
     navigate("/"); // Navigate to homepage, which will show welcome screen
   };
