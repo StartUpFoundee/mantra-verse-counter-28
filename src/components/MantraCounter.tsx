@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { SpeechDetection } from "@/utils/speechDetection";
@@ -14,7 +15,7 @@ const MantraCounter: React.FC = () => {
   const [micPermission, setMicPermission] = useState<boolean | null>(null);
   const [showCompletionAlert, setShowCompletionAlert] = useState<boolean>(false);
   const [audioLevel, setAudioLevel] = useState<number>(0);
-  const [sensitivityLevel, setSensitivityLevel] = useState<number>(2); // Start with ultra sensitivity
+  const [sensitivityLevel, setSensitivityLevel] = useState<number>(2);
   const [lifetimeCount, setLifetimeCount] = useState<number>(0);
   const [todayCount, setTodayCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -38,6 +39,37 @@ const MantraCounter: React.FC = () => {
     };
     
     loadCounts();
+
+    // Add volume button listeners for manual counting
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Volume up (Android: 24, iOS: AudioVolumeUp)
+      // Volume down (Android: 25, iOS: AudioVolumeDown)
+      if (event.code === 'AudioVolumeUp' || event.code === 'AudioVolumeDown' || 
+          event.keyCode === 24 || event.keyCode === 25) {
+        event.preventDefault();
+        handleManualCount();
+      }
+    };
+
+    // Add media session handlers for earphone buttons
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.setActionHandler('play', handleManualCount);
+      navigator.mediaSession.setActionHandler('pause', handleManualCount);
+      navigator.mediaSession.setActionHandler('previoustrack', handleManualCount);
+      navigator.mediaSession.setActionHandler('nexttrack', handleManualCount);
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', null);
+        navigator.mediaSession.setActionHandler('pause', null);
+        navigator.mediaSession.setActionHandler('previoustrack', null);
+        navigator.mediaSession.setActionHandler('nexttrack', null);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -59,12 +91,43 @@ const MantraCounter: React.FC = () => {
     setShowCompletionAlert(false);
   };
 
+  const handleManualCount = () => {
+    const now = Date.now();
+    // Prevent double counting with 300ms cooldown for manual counts
+    if (now - lastCountTime.current > 300) {
+      setCurrentCount(count => {
+        const newCount = count + 1;
+        
+        // Vibrate mobile for 1 second (1000ms)
+        if ('vibrate' in navigator) {
+          navigator.vibrate(1000);
+        }
+        
+        // Update counts in IndexedDB
+        updateMantraCounts(1).then(({ lifetimeCount: newLifetime, todayCount: newToday }) => {
+          setLifetimeCount(newLifetime);
+          setTodayCount(newToday);
+        }).catch(console.error);
+        
+        toast.success(`🕉️ Mantra counted: ${newCount}`, {
+          duration: 2000,
+          style: { background: '#262626', color: '#fcd34d' },
+        });
+        
+        return newCount;
+      });
+      
+      lastCountTime.current = now;
+      console.log("📿 Manual mantra count with vibration!");
+    }
+  };
+
   const requestMicPermission = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach(track => track.stop());
       setMicPermission(true);
-      toast.success("🎤 Microphone access granted - Ready for ultra-sensitive voice detection");
+      toast.success("🎤 Microphone access granted - Ready for advanced voice detection");
       return true;
     } catch (error) {
       console.error("Error requesting microphone permission:", error);
@@ -80,21 +143,24 @@ const MantraCounter: React.FC = () => {
       if (!granted) return;
     }
     
-    // Ultra-sensitive settings for all sensitivity levels
-    const minDecibelsSettings = [-60, -75, -90]; // All very sensitive
+    const minDecibelsSettings = [-60, -75, -90];
     
     if (!speechDetection.current) {
       speechDetection.current = new SpeechDetection({
         onSpeechDetected: () => {
-          setAudioLevel(100); // Full visual feedback
-          console.log("🎤 Voice detected - preparing to count!");
+          setAudioLevel(100);
+          console.log("🎤 Human voice detected - mantra in progress!");
         },
         onSpeechEnded: () => {
           const now = Date.now();
-          // Prevent double counting with 500ms cooldown
           if (now - lastCountTime.current > 500) {
             setCurrentCount(count => {
               const newCount = count + 1;
+              
+              // Vibrate mobile for 1 second
+              if ('vibrate' in navigator) {
+                navigator.vibrate(1000);
+              }
               
               // Update counts in IndexedDB
               updateMantraCounts(1).then(({ lifetimeCount: newLifetime, todayCount: newToday }) => {
@@ -111,9 +177,9 @@ const MantraCounter: React.FC = () => {
             });
             
             lastCountTime.current = now;
-            console.log("📿 Mantra successfully counted!");
+            console.log("📿 Voice mantra completed with 1.5s+ gap and vibration!");
           }
-          setAudioLevel(0); // Reset visual feedback
+          setAudioLevel(0);
         },
         minDecibels: minDecibelsSettings[sensitivityLevel]
       });
@@ -123,7 +189,7 @@ const MantraCounter: React.FC = () => {
     if (started) {
       setIsListening(true);
       lastCountTime.current = Date.now();
-      toast.success(`🎧 Ultra-sensitive listening started - even whispers will be detected!`, {
+      toast.success(`🎧 Advanced voice detection started - Long mantras supported with 1.5s gap detection!`, {
         style: { background: '#262626', color: '#fcd34d' }
       });
     } else {
@@ -154,7 +220,7 @@ const MantraCounter: React.FC = () => {
     
     const newLevel = (sensitivityLevel + 1) % 3;
     const labels = ["Normal", "High", "Ultra"];
-    toast.info(`🔊 Sensitivity: ${labels[newLevel]} - Detecting ${newLevel === 2 ? 'whispers' : newLevel === 1 ? 'quiet voices' : 'normal voices'}`, {
+    toast.info(`🔊 Sensitivity: ${labels[newLevel]} - Detecting ${newLevel === 2 ? 'whispers & long mantras' : newLevel === 1 ? 'quiet voices' : 'normal voices'}`, {
       style: { background: '#262626', color: '#fcd34d' }
     });
   };
@@ -200,7 +266,7 @@ const MantraCounter: React.FC = () => {
   const getSensitivityIcon = () => {
     if (sensitivityLevel === 0) return <Volume className="w-5 h-5" />;
     if (sensitivityLevel === 1) return <Volume2 className="w-5 h-5" />;
-    return <VolumeX className="w-5 h-5" />; // Ultra sensitive
+    return <VolumeX className="w-5 h-5" />;
   };
 
   if (isLoading) {
@@ -235,24 +301,20 @@ const MantraCounter: React.FC = () => {
         </div>
       </div>
       
-      {/* Advertisement placeholder */}
       <div className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 mb-6">
-        <p className="text-center text-gray-400 text-sm">Advertisement</p>
-        <p className="text-center text-gray-500 text-xs">Place your ad here</p>
+        <p className="text-center text-gray-400 text-sm">📱 Volume Buttons & Earphone Controls Enabled</p>
+        <p className="text-center text-gray-500 text-xs">Press volume up/down or earphone button to count</p>
       </div>
       
       <div className="counter-display relative mb-10">
-        {/* Gold circle */}
         <div className="relative">
           <div className="w-48 h-48 rounded-full bg-amber-500 flex items-center justify-center">
             <div className="text-white text-5xl font-bold">
-              {/* Om symbol and counter */}
               <div className="text-3xl mb-2">ॐ</div>
               <div>{currentCount}</div>
             </div>
           </div>
           
-          {/* Enhanced listening indicator */}
           {isListening && (
             <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex space-x-1">
               {[...Array(5)].map((_, i) => (
@@ -285,13 +347,13 @@ const MantraCounter: React.FC = () => {
       <div className="text-center mb-5">
         <p className="text-gray-300">
           {isListening 
-            ? "🎤 Listening actively - Speak your mantra at ANY volume!"
-            : "Press the microphone button to start ultra-sensitive voice detection"}
+            ? "🎤 Advanced voice detection active - Long mantras supported!"
+            : "Press microphone for voice detection or use volume buttons"}
         </p>
         <p className="text-xs text-gray-400 mt-1">
           {isListening
-            ? "अल्ट्रा संवेदनशील सुनना - किसी भी आवाज़ में मंत्र बोलें!"
-            : "अति संवेदनशील आवाज़ पहचान शुरू करने के लिए माइक्रोफोन दबाएं"}
+            ? "लंबे मंत्रों के लिए 1.5 सेकंड का अंतराल!"
+            : "आवाज़ की पहचान या वॉल्यूम बटन का उपयोग करें"}
         </p>
       </div>
       

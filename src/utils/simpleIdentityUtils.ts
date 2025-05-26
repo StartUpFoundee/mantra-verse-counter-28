@@ -6,6 +6,7 @@ export interface SimpleUserIdentity {
   dob: string;
   createdAt: string;
   lastLogin: string;
+  qrCode?: string;
 }
 
 // Generate unique ID based on email, name, DOB, and timestamp
@@ -19,11 +20,34 @@ export const generateUniqueId = (name: string, dob: string, email: string): stri
   return `${emailHash}${nameHash}${dobHash}${timestamp.toString().slice(-4)}${randomSuffix}`;
 };
 
-// Save user identity to localStorage
+// Check if email already has an account
+export const emailHasAccount = (email: string): boolean => {
+  const userKey = `user_${email.toLowerCase()}`;
+  return localStorage.getItem(userKey) !== null;
+};
+
+// Get user by email
+export const getUserByEmail = (email: string): SimpleUserIdentity | null => {
+  const userKey = `user_${email.toLowerCase()}`;
+  const stored = localStorage.getItem(userKey);
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch (error) {
+      console.error('Error parsing user data for email:', email, error);
+      return null;
+    }
+  }
+  return null;
+};
+
+// Save user identity with email-based storage
 export const saveSimpleUserIdentity = (identity: SimpleUserIdentity): void => {
+  // Save as current user
   localStorage.setItem('simpleUserIdentity', JSON.stringify(identity));
-  // Also save with email key for login functionality
-  localStorage.setItem(`user_${identity.email}`, JSON.stringify(identity));
+  // Save with email key for future recognition
+  const userKey = `user_${identity.email.toLowerCase()}`;
+  localStorage.setItem(userKey, JSON.stringify(identity));
 };
 
 // Get current user identity
@@ -34,10 +58,7 @@ export const getCurrentSimpleUserIdentity = (): SimpleUserIdentity | null => {
       const identity = JSON.parse(stored);
       // Update last login time
       identity.lastLogin = new Date().toISOString();
-      localStorage.setItem('simpleUserIdentity', JSON.stringify(identity));
-      if (identity.email) {
-        localStorage.setItem(`user_${identity.email}`, JSON.stringify(identity));
-      }
+      saveSimpleUserIdentity(identity);
       return identity;
     } catch (error) {
       console.error('Error parsing user identity:', error);
@@ -52,7 +73,7 @@ export const logoutSimpleUser = (): void => {
   localStorage.removeItem('simpleUserIdentity');
 };
 
-// Create new identity with email
+// Create new identity
 export const createSimpleUserIdentity = (name: string, dob: string, email: string): SimpleUserIdentity => {
   const uniqueId = generateUniqueId(name, dob, email);
   const now = new Date().toISOString();
@@ -67,16 +88,52 @@ export const createSimpleUserIdentity = (name: string, dob: string, email: strin
   };
 };
 
-// Get user by email
-export const getUserByEmail = (email: string): SimpleUserIdentity | null => {
-  const stored = localStorage.getItem(`user_${email.toLowerCase()}`);
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch (error) {
-      console.error('Error parsing user data for email:', email, error);
-      return null;
+// Generate QR code data
+export const generateQRCodeData = (identity: SimpleUserIdentity): string => {
+  const qrData = {
+    id: identity.uniqueId,
+    name: identity.name,
+    email: identity.email,
+    dob: identity.dob,
+    timestamp: identity.createdAt,
+    type: 'MANTRA_COUNTER_ACCOUNT'
+  };
+  return JSON.stringify(qrData);
+};
+
+// Parse QR code data and create account
+export const createAccountFromQRCode = (qrData: string, currentEmail: string): SimpleUserIdentity | null => {
+  try {
+    const data = JSON.parse(qrData);
+    if (data.type !== 'MANTRA_COUNTER_ACCOUNT') {
+      throw new Error('Invalid QR code type');
     }
+    
+    // Create new identity with current email but original data
+    const identity: SimpleUserIdentity = {
+      uniqueId: data.id,
+      name: data.name,
+      email: currentEmail, // Use current email for this device
+      dob: data.dob,
+      createdAt: data.timestamp,
+      lastLogin: new Date().toISOString()
+    };
+    
+    return identity;
+  } catch (error) {
+    console.error('Error parsing QR code data:', error);
+    return null;
+  }
+};
+
+// Auto-detect and login user by email
+export const autoDetectAndLogin = (email: string): SimpleUserIdentity | null => {
+  const existingUser = getUserByEmail(email);
+  if (existingUser) {
+    // Auto-login the user
+    existingUser.lastLogin = new Date().toISOString();
+    saveSimpleUserIdentity(existingUser);
+    return existingUser;
   }
   return null;
 };

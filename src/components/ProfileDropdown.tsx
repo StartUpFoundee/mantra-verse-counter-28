@@ -24,7 +24,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
 
     document.addEventListener("mousedown", handleClickOutside);
 
-    // Get user identity from the new system
+    // Get user identity
     const identity = getCurrentSimpleUserIdentity();
     setUserData(identity);
     
@@ -39,8 +39,10 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
     toast("Logged Out Successfully", {
       description: "You have been logged out. Create a new account or login with existing one."
     });
-    // Quick redirect to homepage
+    
+    // Fast redirect to homepage
     navigate("/", { replace: true });
+    
     // Force immediate reload for fast response
     setTimeout(() => {
       window.location.reload();

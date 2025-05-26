@@ -1,68 +1,66 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, Copy, RefreshCw, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Home, Copy, Download, RefreshCw, Share2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
-import { getCurrentSimpleUserIdentity } from "@/utils/simpleIdentityUtils";
-import { getTodayCount, getLifetimeCount } from "@/utils/indexedDBUtils";
+import { getCurrentSimpleUserIdentity, generateQRCodeData } from "@/utils/simpleIdentityUtils";
 import { QRCode } from "@/components/ui/qr-code";
+import { getTodayCount, getLifetimeCount } from "@/utils/indexedDBUtils";
+import { refreshTodaysActivity } from "@/utils/activeDaysUtils";
 
 const ExportIdPage: React.FC = () => {
   const navigate = useNavigate();
   const [userData, setUserData] = useState<any>(null);
   const [qrData, setQrData] = useState<string>("");
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [todayCount, setTodayCount] = useState<number>(0);
   const [lifetimeCount, setLifetimeCount] = useState<number>(0);
-
-  const loadUserData = async () => {
-    const identity = getCurrentSimpleUserIdentity();
-    if (!identity) {
-      navigate("/");
-      return;
-    }
-
-    const [today, lifetime] = await Promise.all([
-      getTodayCount(),
-      getLifetimeCount()
-    ]);
-
-    setUserData(identity);
-    setTodayCount(today);
-    setLifetimeCount(lifetime);
-
-    // Create comprehensive QR data with current stats
-    const qrPayload = {
-      type: "MantraCounterIdentity",
-      version: "2.0",
-      identity: identity,
-      stats: {
-        todayCount: today,
-        lifetimeCount: lifetime,
-        lastUpdated: new Date().toISOString()
-      },
-      timestamp: Date.now()
-    };
-
-    setQrData(JSON.stringify(qrPayload));
-  };
+  const [todayCount, setTodayCount] = useState<number>(0);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   useEffect(() => {
     loadUserData();
   }, []);
 
+  const loadUserData = async () => {
+    const identity = getCurrentSimpleUserIdentity();
+    if (!identity) {
+      navigate('/');
+      return;
+    }
+    
+    setUserData(identity);
+    
+    // Load current counts
+    const [lifetime, today] = await Promise.all([
+      getLifetimeCount(),
+      getTodayCount()
+    ]);
+    
+    setLifetimeCount(lifetime);
+    setTodayCount(today);
+    
+    // Generate QR code with current data
+    const qrCodeData = generateQRCodeData(identity);
+    setQrData(qrCodeData);
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
+    
     try {
+      // Refresh today's activity data
+      await refreshTodaysActivity();
+      
+      // Reload all data
       await loadUserData();
-      toast("QR Code Refreshed", {
-        description: "QR code updated with latest mantra counts"
+      
+      toast("Data Refreshed", {
+        description: "QR code updated with latest mantra counts!"
       });
     } catch (error) {
+      console.error("Error refreshing data:", error);
       toast("Refresh Failed", {
-        description: "Unable to refresh QR code data"
+        description: "Unable to refresh data. Please try again."
       });
     } finally {
       setIsRefreshing(false);
@@ -75,7 +73,7 @@ const ExportIdPage: React.FC = () => {
     navigator.clipboard.writeText(userData.uniqueId)
       .then(() => {
         toast("ID Copied", {
-          description: "Your unique spiritual ID has been copied"
+          description: "Your unique ID has been copied to clipboard"
         });
       })
       .catch(() => {
@@ -85,227 +83,212 @@ const ExportIdPage: React.FC = () => {
       });
   };
 
-  const handleDownloadQR = () => {
-    const canvas = document.createElement('canvas');
-    const qrElement = document.querySelector('img[alt="QR Code"]') as HTMLImageElement;
+  const handleCopyQRData = () => {
+    if (!qrData) return;
     
-    if (qrElement) {
-      canvas.width = 300;
-      canvas.height = 300;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(qrElement, 0, 0, 300, 300);
-        
-        const link = document.createElement('a');
-        link.download = `mantra-counter-qr-${userData?.name?.replace(/\s+/g, '-').toLowerCase()}.png`;
-        link.href = canvas.toDataURL();
-        link.click();
-        
-        toast("QR Code Downloaded", {
-          description: "QR code saved to your device"
+    navigator.clipboard.writeText(qrData)
+      .then(() => {
+        toast("QR Data Copied", {
+          description: "QR code data copied to clipboard"
         });
-      }
-    }
+      })
+      .catch(() => {
+        toast("Copy Failed", {
+          description: "Could not copy QR data to clipboard"
+        });
+      });
   };
 
-  const handleExportData = () => {
-    if (!userData) return;
+  const handleDownloadQR = () => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx || !userData) return;
+
+    canvas.width = 400;
+    canvas.height = 500;
     
-    const exportData = {
-      identity: userData,
-      stats: {
-        todayCount,
-        lifetimeCount,
-        exportDate: new Date().toISOString()
-      },
-      instructions: "Use this data to restore your account on another device"
-    };
+    // White background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
+    // Add user info
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${userData.name}`, canvas.width / 2, 30);
     
+    ctx.font = '16px Arial';
+    ctx.fillText(`ID: ${userData.uniqueId}`, canvas.width / 2, 55);
+    ctx.fillText(`Lifetime: ${lifetimeCount} | Today: ${todayCount}`, canvas.width / 2, 80);
+    
+    // Create download
     const link = document.createElement('a');
-    link.setAttribute('href', dataUri);
-    link.setAttribute('download', `mantra-counter-backup-${userData.uniqueId}.json`);
+    link.download = `mantra-counter-id-${userData.uniqueId}.png`;
+    link.href = canvas.toDataURL();
     link.click();
     
-    toast("Data Exported", {
-      description: "Your complete spiritual data has been downloaded"
+    toast("QR Code Downloaded", {
+      description: "Your QR code has been saved to downloads"
     });
+  };
+
+  const handleShare = () => {
+    const shareText = `My Mantra Counter ID: ${userData?.uniqueId}\nLifetime: ${lifetimeCount} mantras\nToday: ${todayCount} mantras`;
+    
+    if (navigator.share) {
+      navigator.share({
+        title: 'My Mantra Counter Progress',
+        text: shareText
+      });
+    } else {
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+      window.open(whatsappUrl, '_blank');
+    }
   };
 
   if (!userData) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-amber-400">Loading your spiritual identity...</p>
-        </div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white">
+        <div className="mb-4 text-amber-400 text-lg">Loading...</div>
+        <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 lg:p-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <Button
+    <div className="min-h-screen flex flex-col bg-black text-white">
+      <header className="py-4 px-4 flex justify-between items-center">
+        <Button 
+          variant="ghost" 
+          size="icon"
+          className="text-amber-400 hover:bg-zinc-800"
           onClick={() => navigate('/')}
-          variant="ghost"
-          className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
         >
-          <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Home
+          <ArrowLeft className="h-6 w-6" />
         </Button>
-        <h1 className="text-2xl lg:text-3xl font-bold text-amber-400">Export Spiritual ID</h1>
-        <div className="w-24"></div>
-      </div>
-
-      <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Identity Information */}
-        <Card className="bg-zinc-800/50 border-amber-600/20">
-          <CardHeader>
-            <CardTitle className="text-amber-400 flex items-center gap-2">
-              <QrCode className="w-5 h-5" />
-              Your Spiritual Identity
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="text-gray-400 text-sm">Name / नाम</label>
-              <p className="text-white font-medium">{userData.name}</p>
+        <h1 className="text-xl font-bold text-amber-400">Export ID & QR Code</h1>
+        <Button 
+          variant="ghost" 
+          size="icon"
+          className="text-amber-400 hover:bg-zinc-800"
+          onClick={() => navigate('/')}
+        >
+          <Home className="h-6 w-6" />
+        </Button>
+      </header>
+      
+      <main className="flex-1 flex flex-col items-center justify-center px-4 pb-12 space-y-6">
+        {/* User Info Card */}
+        <div className="bg-gradient-to-br from-zinc-800 to-zinc-900 border border-amber-500/30 rounded-xl p-6 w-full max-w-md">
+          <div className="text-center mb-4">
+            <div className="text-4xl mb-2">🕉️</div>
+            <h2 className="text-xl font-bold text-amber-400 mb-1">{userData.name}</h2>
+            <p className="text-gray-300 text-sm mb-2">ID: {userData.uniqueId}</p>
+            <p className="text-gray-300 text-sm">Email: {userData.email}</p>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="bg-zinc-900 rounded-lg p-3 text-center">
+              <p className="text-amber-400 text-lg font-bold">{lifetimeCount}</p>
+              <p className="text-gray-400 text-xs">Lifetime</p>
             </div>
-            
-            <div>
-              <label className="text-gray-400 text-sm">Email / ईमेल</label>
-              <p className="text-white font-medium">{userData.email}</p>
-            </div>
-            
-            <div>
-              <label className="text-gray-400 text-sm">Unique ID / विशिष्ट आईडी</label>
-              <div className="flex items-center gap-2">
-                <p className="text-amber-400 font-mono text-sm break-all">{userData.uniqueId}</p>
-                <Button onClick={handleCopyId} size="sm" variant="ghost" className="p-1">
-                  <Copy className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-            
-            <div>
-              <label className="text-gray-400 text-sm">Date of Birth / जन्म तिथि</label>
-              <p className="text-white">{new Date(userData.dob).toLocaleDateString()}</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-700">
-              <div>
-                <label className="text-gray-400 text-sm">Today's Count</label>
-                <p className="text-2xl font-bold text-green-400">{todayCount}</p>
-              </div>
-              <div>
-                <label className="text-gray-400 text-sm">Lifetime Count</label>
-                <p className="text-2xl font-bold text-amber-400">{lifetimeCount}</p>
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-4">
-              <Button onClick={handleCopyId} variant="outline" className="flex-1">
-                <Copy className="w-4 h-4 mr-2" />
-                Copy ID
-              </Button>
-              <Button onClick={handleExportData} variant="outline" className="flex-1">
-                <Download className="w-4 h-4 mr-2" />
-                Export Data
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* QR Code Section */}
-        <Card className="bg-zinc-800/50 border-amber-600/20">
-          <CardHeader>
-            <CardTitle className="text-amber-400 flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <QrCode className="w-5 h-5" />
-                QR Code for Cross-Device Login
-              </span>
-              <Button
-                onClick={handleRefresh}
-                size="sm"
-                variant="ghost"
-                disabled={isRefreshing}
-                className="text-amber-400 hover:text-amber-300"
-              >
-                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-white p-6 rounded-lg">
-              {qrData && (
-                <QRCode 
-                  value={qrData} 
-                  size={250}
-                  bgColor="#ffffff"
-                  fgColor="#000000"
-                  className="mx-auto"
-                />
-              )}
-            </div>
-            
-            <div className="text-center space-y-2">
-              <p className="text-gray-300 text-sm">
-                Scan this QR code on another device to login instantly
-              </p>
-              <p className="text-gray-400 text-xs">
-                दूसरे डिवाइस पर तुरंत लॉगिन करने के लिए इस QR कोड को स्कैन करें
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <Button 
-                onClick={handleRefresh} 
-                variant="outline" 
-                className="flex-1"
-                disabled={isRefreshing}
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                {isRefreshing ? 'Refreshing...' : 'Refresh QR'}
-              </Button>
-              <Button onClick={handleDownloadQR} variant="outline" className="flex-1">
-                <Download className="w-4 h-4 mr-2" />
-                Download QR
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Instructions */}
-      <Card className="max-w-4xl mx-auto mt-8 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/30">
-        <CardContent className="p-6">
-          <h3 className="text-amber-400 font-semibold mb-3">How to use QR Code / QR कोड का उपयोग कैसे करें</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <h4 className="text-white font-medium mb-2">English Instructions:</h4>
-              <ul className="text-gray-300 space-y-1">
-                <li>• Open Mantra Counter on another device</li>
-                <li>• Click "Login to Existing Account"</li>
-                <li>• Scan this QR code to login instantly</li>
-                <li>• All your data will be synchronized</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-white font-medium mb-2">हिंदी निर्देश:</h4>
-              <ul className="text-gray-300 space-y-1">
-                <li>• दूसरे डिवाइस पर मंत्र काउंटर खोलें</li>
-                <li>• "मौजूदा खाते में लॉगिन करें" पर क्लिक करें</li>
-                <li>• तुरंत लॉगिन के लिए इस QR कोड को स्कैन करें</li>
-                <li>• आपका सारा डेटा सिंक्रोनाइज़ हो जाएगा</li>
-              </ul>
+            <div className="bg-zinc-900 rounded-lg p-3 text-center">
+              <p className="text-amber-400 text-lg font-bold">{todayCount}</p>
+              <p className="text-gray-400 text-xs">Today</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+          
+          <div className="flex gap-2">
+            <Button
+              onClick={handleCopyId}
+              variant="outline"
+              size="sm"
+              className="flex-1 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+            >
+              <Copy className="h-4 w-4 mr-1" />
+              Copy ID
+            </Button>
+            
+            <Button
+              onClick={handleRefresh}
+              variant="outline"
+              size="sm"
+              disabled={isRefreshing}
+              className="flex-1 border-green-500/30 text-green-400 hover:bg-green-500/10"
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          </div>
+        </div>
+        
+        {/* QR Code Section */}
+        <div className="bg-white rounded-xl p-6 w-full max-w-md">
+          <div className="text-center mb-4">
+            <h3 className="text-lg font-bold text-black mb-2">Scan to Transfer Account</h3>
+            <p className="text-gray-600 text-sm">Use this QR code to access your account on other devices</p>
+          </div>
+          
+          {qrData && (
+            <div className="flex justify-center mb-4">
+              <QRCode 
+                value={qrData} 
+                size={200} 
+                bgColor="#ffffff" 
+                fgColor="#000000"
+              />
+            </div>
+          )}
+          
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              onClick={handleCopyQRData}
+              variant="outline"
+              size="sm"
+              className="border-gray-300 text-gray-700 hover:bg-gray-100"
+            >
+              <Copy className="h-4 w-4 mr-1" />
+              Copy
+            </Button>
+            
+            <Button
+              onClick={handleDownloadQR}
+              variant="outline"
+              size="sm"
+              className="border-gray-300 text-gray-700 hover:bg-gray-100"
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Download
+            </Button>
+            
+            <Button
+              onClick={handleShare}
+              variant="outline"
+              size="sm"
+              className="border-gray-300 text-gray-700 hover:bg-gray-100"
+            >
+              <Share2 className="h-4 w-4 mr-1" />
+              Share
+            </Button>
+          </div>
+        </div>
+        
+        {/* Instructions */}
+        <div className="w-full max-w-md bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+          <h4 className="text-amber-400 font-medium mb-2">How to use on another device:</h4>
+          <div className="text-sm text-gray-300 space-y-1">
+            <p>1. 📱 Open website on new device</p>
+            <p>2. 📧 Enter a different email address</p>
+            <p>3. 🔍 Click "Login with QR Code"</p>
+            <p>4. 📋 Paste the QR data you copied</p>
+            <p>5. ✅ Your account will be transferred!</p>
+          </div>
+          <div className="mt-3 text-xs text-amber-300">
+            <p>दूसरे डिवाइस पर उपयोग करने के लिए:</p>
+            <p>क्यूआर कोड डेटा कॉपी करें और नए डिवाइस पर पेस्ट करें!</p>
+          </div>
+        </div>
+      </main>
     </div>
   );
 };
