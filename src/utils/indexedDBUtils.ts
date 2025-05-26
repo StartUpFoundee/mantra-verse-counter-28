@@ -393,6 +393,50 @@ export const updateMantraCounts = async (increment: number = 1): Promise<{lifeti
 };
 
 /**
+ * Get chants by date for activity tracking
+ */
+export const getChantsByDate = async (date: string): Promise<Array<{count: number, timestamp: number}>> => {
+  try {
+    const activityData = await getData(STORES.activityData, date);
+    if (activityData && activityData.chants) {
+      return activityData.chants;
+    }
+    
+    // If no specific activity data, check if there's count data for this date
+    const todayCountData = await getData(STORES.mantrasData, KEYS.todayCount);
+    if (todayCountData && todayCountData.date === date && todayCountData.value > 0) {
+      return [{ count: todayCountData.value, timestamp: Date.now() }];
+    }
+    
+    return [];
+  } catch (error) {
+    console.error("Error getting chants by date:", error);
+    return [];
+  }
+};
+
+/**
+ * Store daily chant activity
+ */
+export const storeDailyActivity = async (date: string, count: number): Promise<void> => {
+  try {
+    const existingData = await getData(STORES.activityData, date);
+    const chants = existingData?.chants || [];
+    
+    // Add new chant entry
+    chants.push({ count, timestamp: Date.now() });
+    
+    await storeData(STORES.activityData, {
+      date,
+      chants,
+      totalCount: chants.reduce((sum, chant) => sum + chant.count, 0)
+    });
+  } catch (error) {
+    console.error("Error storing daily activity:", error);
+  }
+};
+
+/**
  * Check if browser supports IndexedDB
  */
 export const isIndexedDBSupported = (): boolean => {

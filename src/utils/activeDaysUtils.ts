@@ -1,5 +1,5 @@
 
-import { getChantsByDate } from './indexedDBUtils';
+import { getChantsByDate, getTodayCount, getLifetimeCount } from './indexedDBUtils';
 
 export interface ActiveDayData {
   date: string;
@@ -47,14 +47,29 @@ export const getActiveDaysData = async (year: number, month: number): Promise<Ac
     const chants = await getChantsByDate(date);
     const count = chants.reduce((sum, chant) => sum + chant.count, 0);
     
-    const motivation = getMotivationLevel(count);
-    
-    activeDays.push({
-      date,
-      count,
-      level: motivation.level as any,
-      intensity: motivation.intensity
-    });
+    // For today, also check the current today count
+    const today = new Date().toISOString().split('T')[0];
+    if (date === today) {
+      const todayCount = await getTodayCount();
+      const totalCount = Math.max(count, todayCount);
+      const motivation = getMotivationLevel(totalCount);
+      
+      activeDays.push({
+        date,
+        count: totalCount,
+        level: motivation.level as any,
+        intensity: motivation.intensity
+      });
+    } else {
+      const motivation = getMotivationLevel(count);
+      
+      activeDays.push({
+        date,
+        count,
+        level: motivation.level as any,
+        intensity: motivation.intensity
+      });
+    }
   }
 
   return activeDays;
@@ -68,6 +83,7 @@ export const calculateStreakInfo = async (): Promise<StreakInfo> => {
   let maxStreak = 0;
   let totalActiveDays = 0;
   let tempStreak = 0;
+  let streakBroken = false;
 
   // Check last 365 days for comprehensive streak calculation
   const today = new Date();
@@ -75,27 +91,45 @@ export const calculateStreakInfo = async (): Promise<StreakInfo> => {
 
   for (let d = new Date(oneYearAgo); d <= today; d.setDate(d.getDate() + 1)) {
     const dateStr = d.toISOString().split('T')[0];
-    const chants = await getChantsByDate(dateStr);
-    const count = chants.reduce((sum, chant) => sum + chant.count, 0);
+    const todayStr = today.toISOString().split('T')[0];
+    
+    let count = 0;
+    
+    // For today, get the current count
+    if (dateStr === todayStr) {
+      count = await getTodayCount();
+    } else {
+      // For other days, get from stored activity data
+      const chants = await getChantsByDate(dateStr);
+      count = chants.reduce((sum, chant) => sum + chant.count, 0);
+    }
 
     if (count > 0) {
       tempStreak++;
       totalActiveDays++;
       
-      // Update current streak only if it's recent
-      const daysDiff = Math.floor((today.getTime() - d.getTime()) / (24 * 60 * 60 * 1000));
-      if (daysDiff === 0 || (tempStreak > 0 && daysDiff < tempStreak)) {
+      // Only count towards current streak if we haven't broken it yet
+      if (!streakBroken) {
         currentStreak = tempStreak;
       }
     } else {
+      // Update max streak if current temp streak is higher
       maxStreak = Math.max(maxStreak, tempStreak);
-      if (d.toDateString() === today.toDateString()) {
-        currentStreak = 0; // Reset if no activity today
+      
+      // If this is today or a recent day, mark streak as broken
+      const daysDiff = Math.floor((today.getTime() - d.getTime()) / (24 * 60 * 60 * 1000));
+      if (daysDiff <= 1) {
+        streakBroken = true;
+        if (daysDiff === 0) {
+          currentStreak = 0; // No activity today breaks the streak
+        }
       }
+      
       tempStreak = 0;
     }
   }
 
+  // Final check for max streak
   maxStreak = Math.max(maxStreak, tempStreak);
 
   return {
