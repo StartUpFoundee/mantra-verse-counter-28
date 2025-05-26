@@ -4,24 +4,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, Calendar, Mail } from "lucide-react";
+import { User, Calendar } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { 
-  createUserIdentity, 
-  saveUserIdentity, 
-  validateEmail 
-} from "@/utils/portableIdentityUtils";
+  createSimpleUserIdentity, 
+  saveSimpleUserIdentity 
+} from "@/utils/simpleIdentityUtils";
 
 interface SimpleIdentityCreatorProps {
   onIdentityCreated: () => void;
 }
 
 const SimpleIdentityCreator: React.FC<SimpleIdentityCreatorProps> = ({ onIdentityCreated }) => {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2>(1);
   const [formData, setFormData] = useState({
     name: "",
-    dob: "",
-    email: ""
+    dob: ""
   });
   const [isCreating, setIsCreating] = useState(false);
 
@@ -32,23 +30,12 @@ const SimpleIdentityCreator: React.FC<SimpleIdentityCreatorProps> = ({ onIdentit
         return;
       }
       setStep(2);
-    } else if (step === 2) {
-      if (!formData.dob) {
-        toast("Date of Birth Required", { description: "Please select your date of birth" });
-        return;
-      }
-      setStep(3);
     }
   };
 
   const handleCreateIdentity = async () => {
-    if (!formData.email.trim()) {
-      toast("Email Required", { description: "Please enter your email address" });
-      return;
-    }
-
-    if (!validateEmail(formData.email)) {
-      toast("Invalid Email", { description: "Please enter a valid email address" });
+    if (!formData.dob) {
+      toast("Date of Birth Required", { description: "Please select your date of birth" });
       return;
     }
 
@@ -56,17 +43,13 @@ const SimpleIdentityCreator: React.FC<SimpleIdentityCreatorProps> = ({ onIdentit
 
     try {
       // Create identity
-      const identity = await createUserIdentity(
-        formData.name.trim(), 
-        formData.dob, 
-        formData.email.trim()
-      );
+      const identity = createSimpleUserIdentity(formData.name.trim(), formData.dob);
 
       // Save identity
-      await saveUserIdentity(identity);
+      saveSimpleUserIdentity(identity);
 
       toast("Identity Created Successfully", {
-        description: `Welcome ${identity.name}! Your spiritual journey begins now.`
+        description: `Welcome ${identity.name}! Your unique ID: ${identity.uniqueId}`
       });
 
       onIdentityCreated();
@@ -121,13 +104,13 @@ const SimpleIdentityCreator: React.FC<SimpleIdentityCreatorProps> = ({ onIdentit
           <CardHeader>
             <CardTitle className="text-amber-400 flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Step 2: Date of Birth
+              Step 2: Complete Your Identity
             </CardTitle>
             <CardDescription className="text-gray-300">
               When were you born? / आप कब पैदा हुए थे?
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             <div>
               <Label htmlFor="dob" className="text-amber-400">
                 Date of Birth / जन्म तिथि
@@ -140,58 +123,11 @@ const SimpleIdentityCreator: React.FC<SimpleIdentityCreatorProps> = ({ onIdentit
                 className="bg-zinc-900 border-zinc-600 text-white h-12"
               />
             </div>
+
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 onClick={() => setStep(1)}
-                className="flex-1 h-12 border-zinc-600 text-gray-300"
-              >
-                Back / वापस
-              </Button>
-              <Button
-                onClick={handleNext}
-                className="flex-1 h-12 bg-amber-600 hover:bg-amber-700 text-white"
-              >
-                Next / आगे
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {step === 3 && (
-        <Card className="bg-zinc-800/50 border-zinc-700">
-          <CardHeader>
-            <CardTitle className="text-amber-400 flex items-center gap-2">
-              <Mail className="h-5 w-5" />
-              Step 3: Email Address
-            </CardTitle>
-            <CardDescription className="text-gray-300">
-              Complete your spiritual identity / अपनी आध्यात्मिक पहचान पूरी करें
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <Label htmlFor="email" className="text-amber-400">
-                Email Address / ईमेल पता
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your.email@example.com"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="bg-zinc-900 border-zinc-600 text-white h-12"
-              />
-              <p className="text-xs text-gray-400 mt-2">
-                This email will be used to create your unique spiritual identity
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setStep(2)}
                 className="flex-1 h-12 border-zinc-600 text-gray-300"
                 disabled={isCreating}
               >

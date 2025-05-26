@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getCurrentUserIdentity, logoutCurrentUser } from "@/utils/portableIdentityUtils";
+import { getCurrentSimpleUserIdentity, logoutSimpleUser } from "@/utils/simpleIdentityUtils";
 import { UserRound, Copy, Download, LogOut, QrCode } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
@@ -25,7 +25,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
     document.addEventListener("mousedown", handleClickOutside);
 
     // Get user identity from the new system
-    const identity = getCurrentUserIdentity();
+    const identity = getCurrentSimpleUserIdentity();
     setUserData(identity);
     
     return () => {
@@ -34,9 +34,12 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
   }, [onClose]);
 
   const handleLogout = async () => {
-    await logoutCurrentUser();
+    logoutSimpleUser();
     onClose();
     navigate("/"); // Navigate to homepage, which will show welcome screen
+    toast("Logged Out Successfully", {
+      description: "You have been logged out. Create a new account or login with existing one."
+    });
   };
 
   const handleCopyId = () => {
@@ -75,9 +78,9 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
     onClose();
   };
 
-  const handleViewProfile = () => {
+  const handleViewExportId = () => {
     onClose();
-    navigate('/spiritual-id');
+    navigate('/export-id');
   };
 
   const toggleIdCopy = () => {
@@ -94,17 +97,16 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
       <div className="px-4 py-3 border-b border-zinc-700">
         <p className="text-sm font-medium text-amber-400">{userData.name}</p>
         <p className="text-xs text-gray-400 mt-1">ID: {userData.uniqueId}</p>
-        <p className="text-xs text-gray-500 mt-1">{userData.email}</p>
       </div>
       
       <ul>
         <li>
           <button 
             className="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-zinc-700"
-            onClick={handleViewProfile}
+            onClick={handleViewExportId}
           >
             <QrCode size={16} className="mr-2 text-gray-400" />
-            View Profile & QR
+            Export ID & QR
           </button>
         </li>
         <li>

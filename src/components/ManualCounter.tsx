@@ -35,17 +35,28 @@ const ManualCounter: React.FC = () => {
     loadCounts();
   }, []);
 
-  // Listen for volume and media button events
+  // Vibrate function
+  const vibratePhone = () => {
+    if (navigator.vibrate) {
+      navigator.vibrate(100); // Vibrate for 100ms
+    }
+  };
+
+  // Listen for volume buttons, earphone buttons, and other keys
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Volume up/down or media buttons
+      // Volume up/down, media buttons, space, plus/minus keys
       if (
         event.key === "AudioVolumeUp" || 
         event.key === "AudioVolumeDown" || 
         event.key === "MediaPlayPause" ||
+        event.key === "MediaTrackNext" ||
+        event.key === "MediaTrackPrevious" ||
         event.code === "KeyPlus" ||
         event.code === "KeyMinus" ||
-        event.code === "Space"
+        event.code === "Space" ||
+        event.code === "ArrowUp" ||
+        event.code === "ArrowDown"
       ) {
         if (targetCount !== null) {
           incrementCount();
@@ -54,9 +65,23 @@ const ManualCounter: React.FC = () => {
       }
     };
 
+    // Also listen for hardware button events
+    const handleVolumeButton = (event: Event) => {
+      if (targetCount !== null) {
+        incrementCount();
+        event.preventDefault();
+      }
+    };
+
     window.addEventListener("keydown", handleKeyDown);
+    // Listen for hardware volume button events
+    document.addEventListener("volumeupbutton", handleVolumeButton, false);
+    document.addEventListener("volumedownbutton", handleVolumeButton, false);
+    
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("volumeupbutton", handleVolumeButton, false);
+      document.removeEventListener("volumedownbutton", handleVolumeButton, false);
     };
   }, [targetCount, currentCount]);
 
@@ -71,6 +96,9 @@ const ManualCounter: React.FC = () => {
     
     const newCount = currentCount + 1;
     setCurrentCount(newCount);
+    
+    // Vibrate the phone
+    vibratePhone();
     
     try {
       // Update counts in IndexedDB and get updated values
@@ -171,8 +199,9 @@ const ManualCounter: React.FC = () => {
       </div>
       
       <div className="text-center mb-5 text-sm text-gray-300">
-        <p>Tap the circle, use earphone button, or volume buttons to count</p>
-        <p className="text-xs text-gray-400 mt-1">सर्कल पर टैप करें, ईयरफोन बटन या वॉल्यूम बटन का उपयोग करके गिनें</p>
+        <p>Tap circle, volume buttons, or earphone button to count</p>
+        <p className="text-xs text-gray-400 mt-1">सर्कल, वॉल्यूम बटन या ईयरफोन बटन दबाएं</p>
+        <p className="text-xs text-green-400 mt-1">📳 Phone will vibrate on each count</p>
       </div>
       
       <div className="flex gap-4">

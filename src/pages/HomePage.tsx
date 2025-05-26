@@ -2,17 +2,15 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mic, Hand, Infinity, Clock, Trophy } from "lucide-react";
-import { getCurrentUserIdentity } from "@/utils/portableIdentityUtils";
+import { getCurrentSimpleUserIdentity } from "@/utils/simpleIdentityUtils";
 import ThemeToggle from "@/components/ThemeToggle";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import ProfileHeader from "@/components/ProfileHeader";
 import WelcomePopup from "@/components/WelcomePopup";
 import ActiveDaysButton from "@/components/ActiveDaysButton";
-import FastLogout from "@/components/FastLogout";
 import { getLifetimeCount, getTodayCount } from "@/utils/indexedDBUtils";
-import { calculateStreakInfo, recordTodaysActivity } from "@/utils/activeDaysUtils";
+import { getStreakData, recordTodaysActivity } from "@/utils/activeDaysUtils";
 import { getAchievementsForProfile } from "@/utils/motivationUtils";
-import { toast } from "@/components/ui/sonner";
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -28,7 +26,7 @@ const HomePage: React.FC = () => {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const identity = getCurrentUserIdentity();
+        const identity = getCurrentSimpleUserIdentity();
         
         if (identity) {
           setIsLoggedIn(true);
@@ -37,7 +35,7 @@ const HomePage: React.FC = () => {
           const [lifetime, today, streakData] = await Promise.all([
             getLifetimeCount(),
             getTodayCount(),
-            calculateStreakInfo()
+            getStreakData()
           ]);
           
           setLifetimeCount(lifetime);
@@ -112,7 +110,6 @@ const HomePage: React.FC = () => {
       
       <header className="py-4 text-center relative">
         <div className="absolute right-4 top-4 flex items-center gap-2">
-          <FastLogout />
           <ThemeToggle />
           <ProfileHeader />
         </div>
@@ -121,7 +118,7 @@ const HomePage: React.FC = () => {
           <p className="text-gray-300">
             {userData ? `Namaste, ${userData.name} Ji` : 'Count your spiritual practice with divine blessings'}
           </p>
-          <p className="text-xs text-gray-400 mt-1">Email: {userData?.email}</p>
+          <p className="text-xs text-gray-400 mt-1">ID: {userData?.uniqueId}</p>
           {achievements.length > 0 && (
             <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
               <Trophy className="h-5 w-5 text-amber-400" />

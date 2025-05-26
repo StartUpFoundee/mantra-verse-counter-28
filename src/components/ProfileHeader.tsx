@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { getCurrentUserIdentity } from "@/utils/portableIdentityUtils";
+import { getCurrentSimpleUserIdentity } from "@/utils/simpleIdentityUtils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import ProfileDropdown from "./ProfileDropdown";
@@ -11,7 +11,7 @@ const ProfileHeader: React.FC = () => {
   
   useEffect(() => {
     // Get user identity from the new system
-    const identity = getCurrentUserIdentity();
+    const identity = getCurrentSimpleUserIdentity();
     if (identity) {
       setUserData(identity);
     }
@@ -28,7 +28,7 @@ const ProfileHeader: React.FC = () => {
       >
         <Avatar className="h-14 w-14 md:h-16 md:w-16 border-2 border-amber-600/30">
           <AvatarFallback className="bg-amber-500/20 text-amber-400 text-xl md:text-2xl">
-            {userData.symbolImage || "🕉️"}
+            🕉️
           </AvatarFallback>
         </Avatar>
         <span className="text-amber-400 text-sm hidden sm:inline-block">
