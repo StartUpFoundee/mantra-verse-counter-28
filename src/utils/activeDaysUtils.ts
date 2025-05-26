@@ -1,5 +1,6 @@
 
-import { getTodayCount, getLifetimeCount, storeDailyActivity } from './indexedDBUtils';
+import { getTodayCount, getLifetimeCount, updateMantraCounts } from './indexedDBUtils';
+import { getCurrentSimpleUserIdentity } from './simpleIdentityUtils';
 
 export interface ActiveDayData {
   date: string;
@@ -36,48 +37,60 @@ export const getMotivationLevel = (count: number): { level: string; intensity: n
 };
 
 /**
- * Store today's activity when user chants
+ * Store today's activity - Updated to sync with main counting system
  */
 export const recordTodaysActivity = async (additionalCount: number = 0): Promise<void> => {
   const today = new Date().toISOString().split('T')[0];
-  const currentTodayCount = await getTodayCount();
-  const totalCount = currentTodayCount + additionalCount;
+  const user = getCurrentSimpleUserIdentity();
   
-  // Store in localStorage for the active days calendar
-  const activityKey = `mantra_activity_${today}`;
+  if (!user) return;
+  
+  // Get the actual today count from the main system
+  const currentTodayCount = await getTodayCount();
+  const totalCount = currentTodayCount;
+  
+  // Store in localStorage with user-specific key
+  const activityKey = `mantra_activity_${user.uniqueId}_${today}`;
   localStorage.setItem(activityKey, JSON.stringify({
     date: today,
     count: totalCount,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    userId: user.uniqueId
   }));
   
-  // Also store in IndexedDB for consistency
-  await storeDailyActivity(today, totalCount);
+  console.log(`Recorded activity for ${today}: ${totalCount} mantras`);
 };
 
 /**
- * Gets activity data for the calendar
+ * Gets activity data for the calendar - Updated to use main counting data
  */
 export const getActivityData = async (): Promise<{[date: string]: number}> => {
   const activityData: {[date: string]: number} = {};
+  const user = getCurrentSimpleUserIdentity();
+  
+  if (!user) return activityData;
+  
   const today = new Date().toISOString().split('T')[0];
   
-  // Get today's count from IndexedDB
+  // Always get today's count from the main system
   const todayCount = await getTodayCount();
   if (todayCount > 0) {
     activityData[today] = todayCount;
-    // Also ensure it's stored for the calendar
+    // Ensure it's stored for persistence
     await recordTodaysActivity(0);
   }
   
-  // Get all stored activity data from localStorage
+  // Get all stored activity data from localStorage for this user
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith('mantra_activity_')) {
+    if (key && key.startsWith(`mantra_activity_${user.uniqueId}_`)) {
       try {
         const data = JSON.parse(localStorage.getItem(key) || '{}');
-        if (data.date && data.count !== undefined) {
-          activityData[data.date] = data.count;
+        if (data.date && data.count !== undefined && data.userId === user.uniqueId) {
+          // Don't override today's count with stored data if main system has newer data
+          if (data.date !== today || todayCount === 0) {
+            activityData[data.date] = data.count;
+          }
         }
       } catch (error) {
         console.error('Error parsing activity data:', error);
@@ -85,6 +98,7 @@ export const getActivityData = async (): Promise<{[date: string]: number}> => {
     }
   }
   
+  console.log('Activity data loaded:', activityData);
   return activityData;
 };
 

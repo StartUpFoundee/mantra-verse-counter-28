@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,6 +11,7 @@ import ManualCountPage from "./pages/ManualCountPage";
 import SpiritualIdPage from "./pages/SpiritualIdPage";
 import IdentityGuidePage from "./pages/IdentityGuidePage";
 import ActiveDaysPage from "./pages/ActiveDaysPage";
+import ExportIdPage from "./pages/ExportIdPage";
 import NotFound from "./pages/NotFound";
 import { initializeDatabase } from "./utils/indexedDBUtils";
 import { initializeBackupScheduler } from "./utils/backupScheduler";
@@ -41,6 +43,7 @@ const App = () => {
             <Route path="/spiritual-id" element={<SpiritualIdPage />} />
             <Route path="/identity-guide" element={<IdentityGuidePage />} />
             <Route path="/active-days" element={<ActiveDaysPage />} />
+            <Route path="/export-id" element={<ExportIdPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

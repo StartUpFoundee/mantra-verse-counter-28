@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentSimpleUserIdentity, logoutSimpleUser } from "@/utils/simpleIdentityUtils";
-import { UserRound, Copy, Download, LogOut, QrCode } from "lucide-react";
+import { UserRound, Copy, Download, LogOut, QrCode, RefreshCw } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 interface ProfileDropdownProps {
@@ -36,10 +36,15 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
   const handleLogout = async () => {
     logoutSimpleUser();
     onClose();
-    navigate("/"); // Navigate to homepage, which will show welcome screen
     toast("Logged Out Successfully", {
       description: "You have been logged out. Create a new account or login with existing one."
     });
+    // Quick redirect to homepage
+    navigate("/", { replace: true });
+    // Force immediate reload for fast response
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   };
 
   const handleCopyId = () => {
@@ -92,11 +97,12 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
   return (
     <div 
       ref={dropdownRef}
-      className="absolute top-full right-0 mt-2 w-56 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg py-1 z-50"
+      className="absolute top-full right-0 mt-2 w-64 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg py-1 z-50"
     >
       <div className="px-4 py-3 border-b border-zinc-700">
         <p className="text-sm font-medium text-amber-400">{userData.name}</p>
-        <p className="text-xs text-gray-400 mt-1">ID: {userData.uniqueId}</p>
+        <p className="text-xs text-gray-400 mt-1">Email: {userData.email}</p>
+        <p className="text-xs text-gray-400">ID: {userData.uniqueId}</p>
       </div>
       
       <ul>
@@ -106,7 +112,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
             onClick={handleViewExportId}
           >
             <QrCode size={16} className="mr-2 text-gray-400" />
-            Export ID & QR
+            Export ID & QR Code
           </button>
         </li>
         <li>
@@ -136,16 +142,16 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
             onClick={handleExportIdentity}
           >
             <Download size={16} className="mr-2 text-gray-400" />
-            Export Identity
+            Export Identity Data
           </button>
         </li>
         <li className="border-t border-zinc-700 mt-1">
           <button 
-            className="flex items-center w-full px-4 py-2 text-sm text-gray-300 hover:bg-zinc-700"
+            className="flex items-center w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300"
             onClick={handleLogout}
           >
-            <LogOut size={16} className="mr-2 text-gray-400" />
-            Logout
+            <LogOut size={16} className="mr-2" />
+            Logout / लॉगआउट
           </button>
         </li>
       </ul>

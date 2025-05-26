@@ -45,6 +45,7 @@ const HomePage: React.FC = () => {
           // Store today's activity if user has chanted today
           if (today > 0) {
             await recordTodaysActivity(0); // Just to ensure today is recorded
+            console.log(`Recording today's activity: ${today} mantras`);
           }
           
           // Calculate achievements - only show for streaks 21+ days
@@ -119,6 +120,7 @@ const HomePage: React.FC = () => {
             {userData ? `Namaste, ${userData.name} Ji` : 'Count your spiritual practice with divine blessings'}
           </p>
           <p className="text-xs text-gray-400 mt-1">ID: {userData?.uniqueId}</p>
+          <p className="text-xs text-gray-400">Email: {userData?.email}</p>
           {achievements.length > 0 && (
             <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
               <Trophy className="h-5 w-5 text-amber-400" />
