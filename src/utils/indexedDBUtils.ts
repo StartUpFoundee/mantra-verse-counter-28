@@ -416,23 +416,52 @@ export const getChantsByDate = async (date: string): Promise<Array<{count: numbe
 };
 
 /**
- * Store daily chant activity
+ * Store daily chant activity - Enhanced version
  */
 export const storeDailyActivity = async (date: string, count: number): Promise<void> => {
   try {
+    // Store in IndexedDB
     const existingData = await getData(STORES.activityData, date);
     const chants = existingData?.chants || [];
     
-    // Add new chant entry
     chants.push({ count, timestamp: Date.now() });
+    
+    const totalCount = chants.reduce((sum, chant) => sum + chant.count, 0);
     
     await storeData(STORES.activityData, {
       date,
       chants,
-      totalCount: chants.reduce((sum, chant) => sum + chant.count, 0)
+      totalCount
     });
+    
+    // Also store in localStorage for quick access
+    localStorage.setItem(`activity_${date}`, JSON.stringify({
+      date,
+      totalCount,
+      lastUpdate: Date.now()
+    }));
+    
   } catch (error) {
     console.error("Error storing daily activity:", error);
+    
+    // Fallback to localStorage only
+    const existingData = localStorage.getItem(`activity_${date}`);
+    let totalCount = count;
+    
+    if (existingData) {
+      try {
+        const parsed = JSON.parse(existingData);
+        totalCount = parsed.totalCount + count;
+      } catch (e) {
+        console.error("Error parsing existing activity data:", e);
+      }
+    }
+    
+    localStorage.setItem(`activity_${date}`, JSON.stringify({
+      date,
+      totalCount,
+      lastUpdate: Date.now()
+    }));
   }
 };
 

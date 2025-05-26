@@ -8,10 +8,10 @@ import WelcomeScreen from "@/components/WelcomeScreen";
 import ProfileHeader from "@/components/ProfileHeader";
 import WelcomePopup from "@/components/WelcomePopup";
 import ActiveDaysButton from "@/components/ActiveDaysButton";
+import FastLogout from "@/components/FastLogout";
 import { getLifetimeCount, getTodayCount } from "@/utils/indexedDBUtils";
-import { calculateStreakInfo } from "@/utils/activeDaysUtils";
+import { calculateStreakInfo, recordTodaysActivity } from "@/utils/activeDaysUtils";
 import { getAchievementsForProfile } from "@/utils/motivationUtils";
-import { initializeBackupScheduler } from "@/utils/backupScheduler";
 import { toast } from "@/components/ui/sonner";
 
 const HomePage: React.FC = () => {
@@ -44,21 +44,20 @@ const HomePage: React.FC = () => {
           setTodayCount(today);
           setStreakInfo(streakData);
           
+          // Store today's activity if user has chanted today
+          if (today > 0) {
+            await recordTodaysActivity(0); // Just to ensure today is recorded
+          }
+          
           // Calculate achievements - only show for streaks 21+ days
           const userAchievements = getAchievementsForProfile({ currentStreak: streakData.currentStreak });
           setAchievements(userAchievements);
-          
-          // Initialize backup scheduler if Google Drive is enabled
-          if (identity.googleDriveEnabled) {
-            initializeBackupScheduler();
-          }
         } else {
           setIsLoggedIn(false);
           setUserData(null);
         }
       } catch (error) {
         console.error("Error loading data:", error);
-        toast.error("There was an error loading your data. Please try again.");
       } finally {
         setIsLoading(false);
       }
@@ -70,16 +69,16 @@ const HomePage: React.FC = () => {
   if (!isLoggedIn) {
     if (isLoading) {
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white dark:bg-zinc-900">
+        <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white">
           <div className="mb-4 text-amber-400 text-lg">Loading...</div>
-          <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
         </div>
       );
     }
     
     return (
-      <div className="min-h-screen flex flex-col bg-black text-white dark:bg-zinc-900">
-        <header className="py-6 text-center relative">
+      <div className="min-h-screen flex flex-col bg-black text-white">
+        <header className="py-4 text-center relative">
           <div className="absolute right-4 top-4">
             <ThemeToggle />
           </div>
@@ -100,19 +99,20 @@ const HomePage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white dark:bg-zinc-900">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white">
         <div className="mb-4 text-amber-400 text-lg">Loading your spiritual journey...</div>
-        <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-black text-white dark:bg-zinc-900">
+    <div className="min-h-screen flex flex-col bg-black text-white">
       <WelcomePopup />
       
-      <header className="py-6 text-center relative">
+      <header className="py-4 text-center relative">
         <div className="absolute right-4 top-4 flex items-center gap-2">
+          <FastLogout />
           <ThemeToggle />
           <ProfileHeader />
         </div>
@@ -121,6 +121,7 @@ const HomePage: React.FC = () => {
           <p className="text-gray-300">
             {userData ? `Namaste, ${userData.name} Ji` : 'Count your spiritual practice with divine blessings'}
           </p>
+          <p className="text-xs text-gray-400 mt-1">Email: {userData?.email}</p>
           {achievements.length > 0 && (
             <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
               <Trophy className="h-5 w-5 text-amber-400" />
@@ -141,7 +142,7 @@ const HomePage: React.FC = () => {
       <main className="flex-1 flex flex-col items-center justify-center px-4 pb-12 gap-8">
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-4 w-full max-w-lg">
-          <div className="bg-zinc-800/80 rounded-lg p-4 border border-zinc-700 text-center dark:bg-zinc-800 dark:border-zinc-700">
+          <div className="bg-zinc-800/80 rounded-lg p-4 border border-zinc-700 text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
               <Infinity className="w-5 h-5 text-amber-400" />
               <h2 className="text-gray-300 font-medium text-sm">Lifetime</h2>
@@ -149,7 +150,7 @@ const HomePage: React.FC = () => {
             <p className="text-2xl font-bold text-amber-400">{lifetimeCount}</p>
           </div>
           
-          <div className="bg-zinc-800/80 rounded-lg p-4 border border-zinc-700 text-center dark:bg-zinc-800 dark:border-zinc-700">
+          <div className="bg-zinc-800/80 rounded-lg p-4 border border-zinc-700 text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
               <Clock className="w-5 h-5 text-amber-400" />
               <h2 className="text-gray-300 font-medium text-sm">Today</h2>
@@ -185,7 +186,7 @@ const HomePage: React.FC = () => {
             onClick={() => navigate('/manual')}
             className="bg-gradient-to-br from-amber-500 to-amber-700 hover:from-amber-600 hover:to-amber-800 rounded-xl p-1 transform hover:scale-105 transition-all"
           >
-            <div className="bg-zinc-900 rounded-lg p-6 h-full dark:bg-zinc-800">
+            <div className="bg-zinc-900 rounded-lg p-6 h-full">
               <div className="flex justify-center mb-4">
                 <Hand size={64} className="text-amber-400" />
               </div>
@@ -199,7 +200,7 @@ const HomePage: React.FC = () => {
             onClick={() => navigate('/audio')}
             className="bg-gradient-to-br from-amber-500 to-amber-700 hover:from-amber-600 hover:to-amber-800 rounded-xl p-1 transform hover:scale-105 transition-all"
           >
-            <div className="bg-zinc-900 rounded-lg p-6 h-full dark:bg-zinc-800">
+            <div className="bg-zinc-900 rounded-lg p-6 h-full">
               <div className="flex justify-center mb-4">
                 <Mic size={64} className="text-amber-400" />
               </div>

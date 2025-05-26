@@ -1,6 +1,6 @@
 
-import { generateUniqueId, encodeUserData, decodeUserData } from './identityCore';
-import { getUserData, saveUserData, logoutUser } from './indexedDBUtils';
+import { generateUniqueId, encodeUserData, decodeUserData, generateAccountQRData } from './identityCore';
+import { getUserData, saveUserData, logoutUser, getLifetimeCount, getTodayCount } from './indexedDBUtils';
 
 export interface UserIdentity {
   uniqueId: string;
@@ -8,12 +8,11 @@ export interface UserIdentity {
   dob: string;
   email: string;
   createdAt: string;
-  lastBackup?: string;
-  emailBackupEnabled: boolean;
-  googleDriveEnabled: boolean;
+  lastLogin?: string;
   symbol?: string;
   symbolImage?: string;
-  chantingStats?: any;
+  lifetimeCount?: number;
+  todayCount?: number;
 }
 
 /**
@@ -25,11 +24,10 @@ export const validateEmail = (email: string): boolean => {
 };
 
 /**
- * Creates a new user identity with enhanced unique ID generation
+ * Creates a new user identity with email-specific ID
  */
 export const createUserIdentity = async (name: string, dob: string, email: string, symbol: string = "om"): Promise<UserIdentity> => {
-  // Generate truly unique ID using name, DOB, and timestamp
-  const uniqueId = await generateUniqueId(name, dob, Date.now());
+  const uniqueId = await generateUniqueId(email, name, dob);
   
   const identity: UserIdentity = {
     uniqueId,
@@ -37,37 +35,38 @@ export const createUserIdentity = async (name: string, dob: string, email: strin
     dob,
     email: email.toLowerCase().trim(),
     createdAt: new Date().toISOString(),
-    emailBackupEnabled: false,
-    googleDriveEnabled: false,
+    lastLogin: new Date().toISOString(),
     symbol,
     symbolImage: "🕉️",
-    chantingStats: {}
+    lifetimeCount: 0,
+    todayCount: 0
   };
 
   return identity;
 };
 
 /**
- * Saves user identity to storage
+ * Saves user identity to email-specific storage
  */
 export const saveUserIdentity = async (identity: UserIdentity): Promise<void> => {
-  // Convert to format compatible with existing system
   const userData = {
     id: identity.uniqueId,
+    email: identity.email,
     name: identity.name,
     dob: identity.dob,
-    email: identity.email,
     symbol: identity.symbol,
     symbolImage: identity.symbolImage,
     createdAt: identity.createdAt,
     lastLogin: new Date().toISOString(),
-    emailBackupEnabled: identity.emailBackupEnabled,
-    googleDriveEnabled: identity.googleDriveEnabled,
-    lastBackup: identity.lastBackup,
-    chantingStats: identity.chantingStats || {}
+    lifetimeCount: identity.lifetimeCount || 0,
+    todayCount: identity.todayCount || 0
   };
   
-  // Save to IndexedDB
+  // Save with email as key prefix for multiple accounts
+  const emailKey = `chantTrackerUserData_${identity.email}`;
+  localStorage.setItem(emailKey, JSON.stringify(userData));
+  localStorage.setItem('chantTrackerUserData', JSON.stringify(userData)); // Current active user
+  
   await saveUserData(userData);
 };
 
@@ -75,12 +74,10 @@ export const saveUserIdentity = async (identity: UserIdentity): Promise<void> =>
  * Gets the current user identity from storage
  */
 export const getCurrentUserIdentity = (): UserIdentity | null => {
-  // Get user data from IndexedDB (synchronous fallback)
   const userData = localStorage.getItem('chantTrackerUserData');
   
   if (!userData) return null;
   
-  // Decode user data
   try {
     const parsed = JSON.parse(userData);
     return {
@@ -89,12 +86,11 @@ export const getCurrentUserIdentity = (): UserIdentity | null => {
       dob: parsed.dob,
       email: parsed.email,
       createdAt: parsed.createdAt,
-      lastBackup: parsed.lastBackup,
-      emailBackupEnabled: parsed.emailBackupEnabled || false,
-      googleDriveEnabled: parsed.googleDriveEnabled || false,
+      lastLogin: parsed.lastLogin,
       symbol: parsed.symbol,
       symbolImage: parsed.symbolImage,
-      chantingStats: parsed.chantingStats || {}
+      lifetimeCount: parsed.lifetimeCount || 0,
+      todayCount: parsed.todayCount || 0
     };
   } catch (error) {
     console.error('Failed to decode user identity:', error);
@@ -103,51 +99,60 @@ export const getCurrentUserIdentity = (): UserIdentity | null => {
 };
 
 /**
- * Logs out the current user by clearing storage
+ * Gets user identity by email
+ */
+export const getUserIdentityByEmail = (email: string): UserIdentity | null => {
+  const emailKey = `chantTrackerUserData_${email.toLowerCase()}`;
+  const userData = localStorage.getItem(emailKey);
+  
+  if (!userData) return null;
+  
+  try {
+    const parsed = JSON.parse(userData);
+    return {
+      uniqueId: parsed.id || parsed.uniqueId,
+      name: parsed.name,
+      dob: parsed.dob,
+      email: parsed.email,
+      createdAt: parsed.createdAt,
+      lastLogin: parsed.lastLogin,
+      symbol: parsed.symbol,
+      symbolImage: parsed.symbolImage,
+      lifetimeCount: parsed.lifetimeCount || 0,
+      todayCount: parsed.todayCount || 0
+    };
+  } catch (error) {
+    console.error('Failed to decode user identity:', error);
+    return null;
+  }
+};
+
+/**
+ * Logs out the current user
  */
 export const logoutCurrentUser = async (): Promise<void> => {
   await logoutUser();
 };
 
 /**
- * Updates email backup preference
- */
-export const updateEmailBackupPreference = async (enabled: boolean): Promise<void> => {
-  const identity = getCurrentUserIdentity();
-  if (!identity) return;
-
-  const updatedIdentity = { ...identity, emailBackupEnabled: enabled };
-  await saveUserIdentity(updatedIdentity);
-};
-
-/**
- * Updates Google Drive backup preference
- */
-export const updateGoogleDrivePreference = async (enabled: boolean): Promise<void> => {
-  const identity = getCurrentUserIdentity();
-  if (!identity) return;
-
-  const updatedIdentity = { ...identity, googleDriveEnabled: enabled };
-  await saveUserIdentity(updatedIdentity);
-};
-
-/**
- * Recovers user identity from QR code or backup file
+ * Recovers user identity from QR code
  */
 export const recoverUserIdentity = async (data: string): Promise<UserIdentity | null> => {
   try {
-    // Decode the data
-    const identity = decodeUserData(data);
+    const qrData = JSON.parse(data);
     
-    // Validate the unique ID
-    if (!identity.uniqueId) {
-      throw new Error('Invalid identity data: Missing unique ID');
+    if (qrData.type === 'account_transfer' && qrData.data) {
+      const identity = decodeUserData(qrData.data);
+      
+      if (!identity.email) {
+        throw new Error('Invalid identity data: Missing email');
+      }
+      
+      await saveUserIdentity(identity);
+      return identity;
     }
     
-    // Save the recovered identity
-    await saveUserIdentity(identity);
-    
-    return identity;
+    return null;
   } catch (error) {
     console.error('Failed to recover user identity:', error);
     return null;
@@ -155,21 +160,35 @@ export const recoverUserIdentity = async (data: string): Promise<UserIdentity | 
 };
 
 /**
- * Placeholder for backup trigger - simplified for now
+ * Generate QR code for account transfer
  */
-export const triggerBackupIfEnabled = async (): Promise<void> => {
-  // This would trigger backup logic when implemented
-  console.log('Backup check triggered');
+export const generateAccountTransferQR = async (): Promise<string> => {
+  const identity = getCurrentUserIdentity();
+  if (!identity) throw new Error('No active user identity');
+  
+  // Get latest counts
+  const [lifetimeCount, todayCount] = await Promise.all([
+    getLifetimeCount(),
+    getTodayCount()
+  ]);
+  
+  const updatedIdentity = {
+    ...identity,
+    lifetimeCount,
+    todayCount,
+    lastUpdated: new Date().toISOString()
+  };
+  
+  return generateAccountQRData(updatedIdentity);
 };
 
 export default {
   createUserIdentity,
   saveUserIdentity,
   getCurrentUserIdentity,
+  getUserIdentityByEmail,
   logoutCurrentUser,
-  updateEmailBackupPreference,
-  updateGoogleDrivePreference,
   recoverUserIdentity,
-  validateEmail,
-  triggerBackupIfEnabled
+  generateAccountTransferQR,
+  validateEmail
 };
