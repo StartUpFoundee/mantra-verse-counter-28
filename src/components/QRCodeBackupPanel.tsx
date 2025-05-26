@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,8 +12,7 @@ import {
 import { googleDriveService } from "@/utils/googleDriveService";
 import { 
   getBackupScheduleStatus, 
-  forceBackupNow, 
-  getNextBackupDate 
+  forceBackupNow
 } from "@/utils/backupScheduler";
 import { getCurrentUserIdentity } from "@/utils/portableIdentityUtils";
 
