@@ -3,17 +3,14 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Cloud, User, Calendar, Mail } from "lucide-react";
+import { User, Calendar, Mail } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { 
   createUserIdentity, 
   saveUserIdentity, 
   validateEmail 
 } from "@/utils/portableIdentityUtils";
-import { googleDriveService } from "@/utils/googleDriveService";
-import { initializeBackupScheduler } from "@/utils/backupScheduler";
 
 interface SimpleIdentityCreatorProps {
   onIdentityCreated: () => void;
@@ -26,7 +23,6 @@ const SimpleIdentityCreator: React.FC<SimpleIdentityCreatorProps> = ({ onIdentit
     dob: "",
     email: ""
   });
-  const [emergencyBackupEnabled, setEmergencyBackupEnabled] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
   const handleNext = () => {
@@ -65,24 +61,6 @@ const SimpleIdentityCreator: React.FC<SimpleIdentityCreatorProps> = ({ onIdentit
         formData.dob, 
         formData.email.trim()
       );
-
-      // Set emergency backup preference
-      identity.googleDriveEnabled = emergencyBackupEnabled;
-
-      // If emergency backup is enabled, authorize Google Drive
-      if (emergencyBackupEnabled) {
-        await googleDriveService.initialize();
-        const authorized = await googleDriveService.requestAuthorization();
-        if (!authorized) {
-          toast("Backup Setup Failed", {
-            description: "Emergency backup disabled. You can enable it later in profile settings."
-          });
-          identity.googleDriveEnabled = false;
-        } else {
-          // Initialize backup scheduler
-          initializeBackupScheduler();
-        }
-      }
 
       // Save identity
       await saveUserIdentity(identity);
@@ -186,10 +164,10 @@ const SimpleIdentityCreator: React.FC<SimpleIdentityCreatorProps> = ({ onIdentit
           <CardHeader>
             <CardTitle className="text-amber-400 flex items-center gap-2">
               <Mail className="h-5 w-5" />
-              Step 3: Email & Emergency Backup
+              Step 3: Email Address
             </CardTitle>
             <CardDescription className="text-gray-300">
-              Secure your spiritual journey / अपनी आध्यात्मिक यात्रा को सुरक्षित करें
+              Complete your spiritual identity / अपनी आध्यात्मिक पहचान पूरी करें
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -205,40 +183,9 @@ const SimpleIdentityCreator: React.FC<SimpleIdentityCreatorProps> = ({ onIdentit
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="bg-zinc-900 border-zinc-600 text-white h-12"
               />
-            </div>
-
-            {/* Emergency Backup Feature */}
-            <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-amber-400" />
-                  <Label className="text-amber-400 font-medium">
-                    Emergency Backup Feature
-                  </Label>
-                </div>
-                <Switch 
-                  checked={emergencyBackupEnabled}
-                  onCheckedChange={setEmergencyBackupEnabled}
-                />
-              </div>
-              
-              <div className="space-y-2 text-sm">
-                <p className="text-gray-300">
-                  🛡️ <strong>Automatic Protection:</strong> Your spiritual data will be safely backed up to Google Drive on the 15th & 28th of every month.
-                </p>
-                <p className="text-amber-300">
-                  📱 <strong>Device Recovery:</strong> Lost your phone? Recover your account anytime using your email.
-                </p>
-                <p className="text-gray-400 text-xs">
-                  आपातकालीन बैकअप: आपका डेटा हर महीने 15 और 28 तारीख को Google Drive में सुरक्षित होगा।
-                </p>
-              </div>
-
-              {emergencyBackupEnabled && (
-                <div className="mt-3 p-2 bg-green-500/10 border border-green-500/20 rounded text-xs text-green-400">
-                  ✅ Your spiritual journey will be automatically protected!
-                </div>
-              )}
+              <p className="text-xs text-gray-400 mt-2">
+                This email will be used to create your unique spiritual identity
+              </p>
             </div>
 
             <div className="flex gap-2">
