@@ -29,6 +29,7 @@ class WebAuthnIdentityManager {
   private dbName = 'MantraCounterIdentities';
   private dbVersion = 1;
   private storeName = 'identities';
+  private currentIdentityKey = 'currentIdentity';
 
   // Initialize IndexedDB
   private async initDB(): Promise<IDBDatabase> {
@@ -121,6 +122,9 @@ class WebAuthnIdentityManager {
       // Store identity in IndexedDB
       await this.storeIdentity(identity);
 
+      // Set as current identity
+      localStorage.setItem(this.currentIdentityKey, identityId);
+
       console.log('✅ WebAuthn identity created successfully:', identityId);
       return identity;
 
@@ -128,6 +132,34 @@ class WebAuthnIdentityManager {
       console.error('❌ Failed to create WebAuthn identity:', error);
       throw new Error(`Identity creation failed: ${error.message}`);
     }
+  }
+
+  // Get current active identity
+  async getCurrentIdentity(): Promise<UserIdentity | null> {
+    try {
+      const currentId = localStorage.getItem(this.currentIdentityKey);
+      if (!currentId) return null;
+
+      const identities = await this.getAllIdentities();
+      const identity = identities.find(id => id.id === currentId);
+      
+      if (identity) {
+        // Update last login
+        identity.lastLogin = new Date().toISOString();
+        await this.storeIdentity(identity);
+      }
+      
+      return identity || null;
+    } catch (error) {
+      console.error('Failed to get current identity:', error);
+      return null;
+    }
+  }
+
+  // Logout current user
+  logout(): void {
+    localStorage.removeItem(this.currentIdentityKey);
+    localStorage.removeItem('chantTrackerUserData'); // Clear legacy data
   }
 
   // Store identity in IndexedDB
@@ -207,6 +239,9 @@ class WebAuthnIdentityManager {
     // Update last login
     identity.lastLogin = new Date().toISOString();
     await this.storeIdentity(identity);
+    
+    // Set as current identity
+    localStorage.setItem(this.currentIdentityKey, identityId);
     
     return identity;
   }
@@ -370,6 +405,9 @@ class WebAuthnIdentityManager {
       // Store imported identity
       await this.storeIdentity(identity);
       
+      // Set as current identity
+      localStorage.setItem(this.currentIdentityKey, identity.id);
+      
       console.log('✅ Identity imported successfully:', identity.id);
       return identity;
 
@@ -388,7 +426,13 @@ class WebAuthnIdentityManager {
       const store = transaction.objectStore(this.storeName);
       const request = store.delete(identityId);
       
-      request.onsuccess = () => resolve();
+      request.onsuccess = () => {
+        // Clear current identity if it was deleted
+        if (localStorage.getItem(this.currentIdentityKey) === identityId) {
+          localStorage.removeItem(this.currentIdentityKey);
+        }
+        resolve();
+      };
       request.onerror = () => reject(request.error);
     });
   }
