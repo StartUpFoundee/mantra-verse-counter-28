@@ -1,60 +1,52 @@
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mic, Hand, Infinity, Clock, Trophy } from "lucide-react";
-import { getCurrentSimpleUserIdentity } from "@/utils/simpleIdentityUtils";
+import { Mic, Hand, Infinity, Clock, Trophy, User } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
-import WelcomeScreen from "@/components/WelcomeScreen";
-import ProfileHeader from "@/components/ProfileHeader";
-import WelcomePopup from "@/components/WelcomePopup";
 import ActiveDaysButton from "@/components/ActiveDaysButton";
+import IdentityManager from "@/components/IdentityManager";
+import ProfileSection from "@/components/ProfileSection";
+import WelcomePopup from "@/components/WelcomePopup";
 import { getLifetimeCount, getTodayCount } from "@/utils/indexedDBUtils";
 import { getStreakData, recordTodaysActivity } from "@/utils/activeDaysUtils";
 import { getAchievementsForProfile } from "@/utils/motivationUtils";
+import { UserIdentity } from "@/utils/webauthn-identity";
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const [currentIdentity, setCurrentIdentity] = useState<UserIdentity | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
   const [lifetimeCount, setLifetimeCount] = useState<number>(0);
   const [todayCount, setTodayCount] = useState<number>(0);
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [userData, setUserData] = useState<any>(null);
   const [achievements, setAchievements] = useState<any[]>([]);
   const [streakInfo, setStreakInfo] = useState<any>(null);
 
   useEffect(() => {
     const loadData = async () => {
+      if (!currentIdentity) return;
+      
       setIsLoading(true);
       try {
-        const identity = getCurrentSimpleUserIdentity();
+        const [lifetime, today, streakData] = await Promise.all([
+          getLifetimeCount(),
+          getTodayCount(),
+          getStreakData()
+        ]);
         
-        if (identity) {
-          setIsLoggedIn(true);
-          setUserData(identity);
-          
-          const [lifetime, today, streakData] = await Promise.all([
-            getLifetimeCount(),
-            getTodayCount(),
-            getStreakData()
-          ]);
-          
-          setLifetimeCount(lifetime);
-          setTodayCount(today);
-          setStreakInfo(streakData);
-          
-          // Store today's activity if user has chanted today
-          if (today > 0) {
-            await recordTodaysActivity(0); // Just to ensure today is recorded
-            console.log(`Recording today's activity: ${today} mantras`);
-          }
-          
-          // Calculate achievements - only show for streaks 21+ days
-          const userAchievements = getAchievementsForProfile({ currentStreak: streakData.currentStreak });
-          setAchievements(userAchievements);
-        } else {
-          setIsLoggedIn(false);
-          setUserData(null);
+        setLifetimeCount(lifetime);
+        setTodayCount(today);
+        setStreakInfo(streakData);
+        
+        // Store today's activity if user has chanted today
+        if (today > 0) {
+          await recordTodaysActivity(0);
+          console.log(`Recording today's activity: ${today} mantras`);
         }
+        
+        // Calculate achievements - only show for streaks 21+ days
+        const userAchievements = getAchievementsForProfile({ currentStreak: streakData.currentStreak });
+        setAchievements(userAchievements);
       } catch (error) {
         console.error("Error loading data:", error);
       } finally {
@@ -63,35 +55,34 @@ const HomePage: React.FC = () => {
     };
     
     loadData();
-  }, []);
+  }, [currentIdentity]);
 
-  if (!isLoggedIn) {
-    if (isLoading) {
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white">
-          <div className="mb-4 text-amber-400 text-lg">Loading...</div>
-          <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      );
-    }
-    
+  const handleIdentitySelected = (identity: UserIdentity) => {
+    setCurrentIdentity(identity);
+    setShowProfile(false);
+  };
+
+  const handleLogout = () => {
+    setCurrentIdentity(null);
+    setShowProfile(false);
+  };
+
+  // Show identity manager if no identity is selected
+  if (!currentIdentity) {
+    return <IdentityManager onIdentitySelected={handleIdentitySelected} />;
+  }
+
+  // Show profile section if requested
+  if (showProfile) {
     return (
-      <div className="min-h-screen flex flex-col bg-black text-white">
-        <header className="py-4 text-center relative">
-          <div className="absolute right-4 top-4">
-            <ThemeToggle />
-          </div>
-          <h1 className="text-3xl font-bold text-amber-400">Mantra Counter</h1>
-          <p className="text-gray-300 mt-2">Count your spiritual practice with divine blessings</p>
-        </header>
-        
-        <main className="flex-1 flex flex-col items-center justify-center px-4 pb-12">
-          <WelcomeScreen />
-        </main>
-        
-        <footer className="py-4 text-center text-gray-400 text-sm">
-          <p>Created with love for spiritual practice</p>
-        </footer>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white p-4">
+        <ProfileSection identity={currentIdentity} onLogout={handleLogout} />
+        <button
+          onClick={() => setShowProfile(false)}
+          className="mt-4 text-amber-400 hover:text-amber-300 text-sm"
+        >
+          ← Back to Main
+        </button>
       </div>
     );
   }
@@ -112,15 +103,19 @@ const HomePage: React.FC = () => {
       <header className="py-4 text-center relative">
         <div className="absolute right-4 top-4 flex items-center gap-2">
           <ThemeToggle />
-          <ProfileHeader />
+          <button
+            onClick={() => setShowProfile(true)}
+            className="p-2 rounded-full bg-zinc-800 hover:bg-zinc-700 text-amber-400 transition-colors"
+          >
+            <User className="h-5 w-5" />
+          </button>
         </div>
         <h1 className="text-3xl font-bold text-amber-400">Mantra Counter</h1>
         <div className="mt-2">
           <p className="text-gray-300">
-            {userData ? `Namaste, ${userData.name} Ji` : 'Count your spiritual practice with divine blessings'}
+            Namaste, {currentIdentity.name} Ji
           </p>
-          <p className="text-xs text-gray-400 mt-1">ID: {userData?.uniqueId}</p>
-          <p className="text-xs text-gray-400">Email: {userData?.email}</p>
+          <p className="text-xs text-gray-400 mt-1">ID: {currentIdentity.id.substring(0, 12)}...</p>
           {achievements.length > 0 && (
             <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
               <Trophy className="h-5 w-5 text-amber-400" />
