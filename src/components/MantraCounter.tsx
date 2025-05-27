@@ -39,37 +39,6 @@ const MantraCounter: React.FC = () => {
     };
     
     loadCounts();
-
-    // Add volume button listeners for manual counting
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Volume up (Android: 24, iOS: AudioVolumeUp)
-      // Volume down (Android: 25, iOS: AudioVolumeDown)
-      if (event.code === 'AudioVolumeUp' || event.code === 'AudioVolumeDown' || 
-          event.keyCode === 24 || event.keyCode === 25) {
-        event.preventDefault();
-        handleManualCount();
-      }
-    };
-
-    // Add media session handlers for earphone buttons
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.setActionHandler('play', handleManualCount);
-      navigator.mediaSession.setActionHandler('pause', handleManualCount);
-      navigator.mediaSession.setActionHandler('previoustrack', handleManualCount);
-      navigator.mediaSession.setActionHandler('nexttrack', handleManualCount);
-    }
-
-    document.addEventListener('keydown', handleKeyDown);
-    
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.setActionHandler('play', null);
-        navigator.mediaSession.setActionHandler('pause', null);
-        navigator.mediaSession.setActionHandler('previoustrack', null);
-        navigator.mediaSession.setActionHandler('nexttrack', null);
-      }
-    };
   }, []);
 
   useEffect(() => {
@@ -89,37 +58,6 @@ const MantraCounter: React.FC = () => {
     setTargetCount(target);
     setCurrentCount(0);
     setShowCompletionAlert(false);
-  };
-
-  const handleManualCount = () => {
-    const now = Date.now();
-    // Prevent double counting with 300ms cooldown for manual counts
-    if (now - lastCountTime.current > 300) {
-      setCurrentCount(count => {
-        const newCount = count + 1;
-        
-        // Vibrate mobile for 1 second (1000ms)
-        if ('vibrate' in navigator) {
-          navigator.vibrate(1000);
-        }
-        
-        // Update counts in IndexedDB
-        updateMantraCounts(1).then(({ lifetimeCount: newLifetime, todayCount: newToday }) => {
-          setLifetimeCount(newLifetime);
-          setTodayCount(newToday);
-        }).catch(console.error);
-        
-        toast.success(`🕉️ Mantra counted: ${newCount}`, {
-          duration: 2000,
-          style: { background: '#262626', color: '#fcd34d' },
-        });
-        
-        return newCount;
-      });
-      
-      lastCountTime.current = now;
-      console.log("📿 Manual mantra count with vibration!");
-    }
   };
 
   const requestMicPermission = async () => {
@@ -157,11 +95,6 @@ const MantraCounter: React.FC = () => {
             setCurrentCount(count => {
               const newCount = count + 1;
               
-              // Vibrate mobile for 1 second
-              if ('vibrate' in navigator) {
-                navigator.vibrate(1000);
-              }
-              
               // Update counts in IndexedDB
               updateMantraCounts(1).then(({ lifetimeCount: newLifetime, todayCount: newToday }) => {
                 setLifetimeCount(newLifetime);
@@ -177,7 +110,7 @@ const MantraCounter: React.FC = () => {
             });
             
             lastCountTime.current = now;
-            console.log("📿 Voice mantra completed with 1.5s+ gap and vibration!");
+            console.log("📿 Voice mantra completed with 1.2s+ gap and confirmation sound!");
           }
           setAudioLevel(0);
         },
@@ -189,7 +122,7 @@ const MantraCounter: React.FC = () => {
     if (started) {
       setIsListening(true);
       lastCountTime.current = Date.now();
-      toast.success(`🎧 Advanced voice detection started - Long mantras supported with 1.5s gap detection!`, {
+      toast.success(`🎧 Advanced voice detection started - Long mantras supported with 1.2s gap detection!`, {
         style: { background: '#262626', color: '#fcd34d' }
       });
     } else {
@@ -302,8 +235,8 @@ const MantraCounter: React.FC = () => {
       </div>
       
       <div className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 mb-6">
-        <p className="text-center text-gray-400 text-sm">📱 Volume Buttons & Earphone Controls Enabled</p>
-        <p className="text-center text-gray-500 text-xs">Press volume up/down or earphone button to count</p>
+        <p className="text-center text-gray-400 text-sm">🎤 Keep Phone in Pocket Mode</p>
+        <p className="text-center text-gray-500 text-xs">Chant any length mantra - 1.2s pause = new count</p>
       </div>
       
       <div className="counter-display relative mb-10">
@@ -347,13 +280,13 @@ const MantraCounter: React.FC = () => {
       <div className="text-center mb-5">
         <p className="text-gray-300">
           {isListening 
-            ? "🎤 Advanced voice detection active - Long mantras supported!"
-            : "Press microphone for voice detection or use volume buttons"}
+            ? "🎤 Listening for mantras - 0.5s sound after each count"
+            : "Press microphone to start voice detection"}
         </p>
         <p className="text-xs text-gray-400 mt-1">
           {isListening
-            ? "लंबे मंत्रों के लिए 1.5 सेकंड का अंतराल!"
-            : "आवाज़ की पहचान या वॉल्यूम बटन का उपयोग करें"}
+            ? "मंत्र के बाद 1.2 सेकंड का अंतराल रखें"
+            : "आवाज़ की पहचान शुरू करने के लिए माइक दबाएं"}
         </p>
       </div>
       

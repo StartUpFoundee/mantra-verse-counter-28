@@ -71,7 +71,7 @@ export class SpeechDetection {
       setTimeout(() => this.calibrateBaseline(), 1000);
       this.detectHumanVoice();
       
-      console.log("🎤 Advanced human voice detection started - Long mantra support with 1.5-2s gap detection");
+      console.log("🎤 Advanced human voice detection started - Long mantra support with 1.2s gap detection");
       return true;
     } catch (error) {
       console.error("Error starting speech detection:", error);
@@ -243,8 +243,8 @@ export class SpeechDetection {
       if (this.mantraInProgress) {
         this.silenceTimer += 0.1; // Increment silence timer (assuming 100ms intervals)
         
-        // Check if silence gap indicates mantra completion (1.5-2 seconds)
-        if (this.silenceTimer >= 1.5) {
+        // Check if silence gap indicates mantra completion (1.2 seconds for user requirement)
+        if (this.silenceTimer >= 1.2) {
           // Mantra completed!
           this.mantraInProgress = false;
           this.consecutiveSpeechFrames = 0;
@@ -261,7 +261,7 @@ export class SpeechDetection {
               console.log("✅ Ready for next mantra");
             }, 500);
             
-            console.log(`📿 MANTRA COMPLETED! 1.5s+ silence gap detected. Playing confirmation sound.`);
+            console.log(`📿 MANTRA COMPLETED! 1.2s+ silence gap detected. Playing confirmation sound.`);
           }
         }
       } else {

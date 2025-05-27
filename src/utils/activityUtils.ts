@@ -1,14 +1,8 @@
 
-import { getData, storeData, getAllData } from './indexedDBUtils';
+import { getTodayCount, getLifetimeCount } from './indexedDBUtils';
 
-const STORES = {
-  activity: "activityData"
-};
-
-export interface DailyActivity {
-  date: string;
-  count: number;
-  timestamp: number;
+export interface ActivityData {
+  [date: string]: number;
 }
 
 export interface StreakData {
@@ -18,105 +12,96 @@ export interface StreakData {
 }
 
 /**
- * Record daily activity when user completes jaaps
+ * Get activity data from IndexedDB for the calendar display
  */
-export const recordDailyActivity = async (count: number = 1): Promise<void> => {
-  const today = new Date().toISOString().split('T')[0];
-  
+export const getActivityData = async (): Promise<ActivityData> => {
   try {
-    // Get existing activity for today
-    const existingActivity = await getData(STORES.activity, today);
-    const currentCount = existingActivity ? existingActivity.count : 0;
+    // Get today's count from IndexedDB
+    const todayCount = await getTodayCount();
+    const today = new Date().toISOString().split('T')[0];
     
-    // Update activity count
-    const activityData: DailyActivity = {
-      date: today,
-      count: currentCount + count,
-      timestamp: Date.now()
-    };
+    // For now, we'll just show today's data
+    // In a full implementation, you'd store historical data
+    const activityData: ActivityData = {};
     
-    await storeData(STORES.activity, activityData, today);
+    if (todayCount > 0) {
+      activityData[today] = todayCount;
+    }
+    
+    // Get any existing historical data from localStorage as fallback
+    const existingData = localStorage.getItem('activeDays');
+    if (existingData) {
+      try {
+        const historicalData = JSON.parse(existingData);
+        // Merge historical data but prioritize today's IndexedDB data
+        for (const day of historicalData) {
+          if (day.date !== today) {
+            activityData[day.date] = day.mantraCount || 0;
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing historical activity data:', error);
+      }
+    }
+    
+    return activityData;
   } catch (error) {
-    console.error("Failed to record daily activity:", error);
-  }
-};
-
-/**
- * Get all activity data for calendar display
- */
-export const getActivityData = async (): Promise<{[date: string]: number}> => {
-  try {
-    const allActivity = await getAllData(STORES.activity);
-    const activityMap: {[date: string]: number} = {};
-    
-    allActivity.forEach((activity: DailyActivity) => {
-      activityMap[activity.date] = activity.count;
-    });
-    
-    return activityMap;
-  } catch (error) {
-    console.error("Failed to get activity data:", error);
+    console.error('Error getting activity data:', error);
     return {};
   }
 };
 
 /**
- * Calculate streak data
+ * Get streak data based on activity
  */
 export const getStreakData = async (): Promise<StreakData> => {
   try {
     const activityData = await getActivityData();
-    const dates = Object.keys(activityData).sort();
+    const dates = Object.keys(activityData).filter(date => activityData[date] > 0).sort();
+    
+    let currentStreak = 0;
+    let maxStreak = 0;
+    let totalActiveDays = dates.length;
     
     if (dates.length === 0) {
       return { currentStreak: 0, maxStreak: 0, totalActiveDays: 0 };
     }
     
-    // Calculate total active days
-    const totalActiveDays = dates.length;
-    
     // Calculate current streak (working backwards from today)
-    const today = new Date().toISOString().split('T')[0];
-    let currentStreak = 0;
-    let checkDate = new Date();
+    const today = new Date();
+    let currentDate = new Date(today);
     
-    while (true) {
-      const dateStr = checkDate.toISOString().split('T')[0];
+    while (currentDate >= new Date(dates[0])) {
+      const dateStr = currentDate.toISOString().split('T')[0];
       if (activityData[dateStr] && activityData[dateStr] > 0) {
         currentStreak++;
-        checkDate.setDate(checkDate.getDate() - 1);
-      } else if (dateStr === today) {
-        // If today has no activity, start checking from yesterday
-        checkDate.setDate(checkDate.getDate() - 1);
-        continue;
       } else {
         break;
       }
+      currentDate.setDate(currentDate.getDate() - 1);
     }
     
     // Calculate max streak
-    let maxStreak = 0;
     let tempStreak = 0;
-    let previousDate: Date | null = null;
+    let lastDate: Date | null = null;
     
-    dates.forEach(dateStr => {
-      const currentDate = new Date(dateStr);
+    for (const dateStr of dates) {
+      const currentDateObj = new Date(dateStr);
       
-      if (previousDate) {
-        const dayDiff = Math.floor((currentDate.getTime() - previousDate.getTime()) / (1000 * 60 * 60 * 24));
-        
-        if (dayDiff === 1) {
+      if (lastDate === null) {
+        tempStreak = 1;
+      } else {
+        const daysDiff = Math.floor((currentDateObj.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysDiff === 1) {
           tempStreak++;
         } else {
           maxStreak = Math.max(maxStreak, tempStreak);
           tempStreak = 1;
         }
-      } else {
-        tempStreak = 1;
       }
       
-      previousDate = currentDate;
-    });
+      lastDate = currentDateObj;
+    }
     
     maxStreak = Math.max(maxStreak, tempStreak);
     
@@ -126,13 +111,7 @@ export const getStreakData = async (): Promise<StreakData> => {
       totalActiveDays
     };
   } catch (error) {
-    console.error("Failed to calculate streak data:", error);
+    console.error('Error calculating streak data:', error);
     return { currentStreak: 0, maxStreak: 0, totalActiveDays: 0 };
   }
-};
-
-export default {
-  recordDailyActivity,
-  getActivityData,
-  getStreakData
 };
