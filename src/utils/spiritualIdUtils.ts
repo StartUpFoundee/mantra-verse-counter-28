@@ -1,10 +1,10 @@
 
 /**
  * Legacy compatibility utilities for spiritual ID functionality
- * Now integrated with WebAuthn identity system
+ * Now integrated with Crypto identity system
  */
 
-import { webAuthnIdentity } from './webauthn-identity';
+import { cryptoIdentity } from './crypto-identity';
 import { getUserData, saveUserData, logoutUser, getLifetimeCount, getTodayCount } from './indexedDBUtils';
 
 /**

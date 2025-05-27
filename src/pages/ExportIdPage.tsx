@@ -4,14 +4,14 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Home, Copy, Download, RefreshCw, Share2 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
-import { webAuthnIdentity, UserIdentity } from "@/utils/webauthn-identity";
+import { cryptoIdentity, CryptoIdentity } from "@/utils/crypto-identity";
 import { QRCode } from "@/components/ui/qr-code";
 import { getTodayCount, getLifetimeCount } from "@/utils/indexedDBUtils";
 import { refreshTodaysActivity } from "@/utils/activeDaysUtils";
 
 const ExportIdPage: React.FC = () => {
   const navigate = useNavigate();
-  const [currentIdentity, setCurrentIdentity] = useState<UserIdentity | null>(null);
+  const [currentIdentity, setCurrentIdentity] = useState<CryptoIdentity | null>(null);
   const [qrData, setQrData] = useState<string>("");
   const [lifetimeCount, setLifetimeCount] = useState<number>(0);
   const [todayCount, setTodayCount] = useState<number>(0);
@@ -22,7 +22,7 @@ const ExportIdPage: React.FC = () => {
   }, []);
 
   const loadUserData = async () => {
-    const identity = await webAuthnIdentity.getCurrentIdentity();
+    const identity = await cryptoIdentity.getCurrentIdentity();
     if (!identity) {
       navigate('/');
       return;
@@ -41,7 +41,7 @@ const ExportIdPage: React.FC = () => {
     
     // Generate QR code with current data
     try {
-      const exportedData = await webAuthnIdentity.exportIdentity(identity.id);
+      const exportedData = await cryptoIdentity.exportIdentity(identity.id);
       setQrData(JSON.stringify(exportedData));
     } catch (error) {
       console.error("Error generating QR data:", error);

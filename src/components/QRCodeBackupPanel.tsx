@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, Upload, QrCode, Shield, CheckCircle, AlertCircle } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { QRCode } from "@/components/ui/qr-code";
-import { webAuthnIdentity } from "@/utils/webauthn-identity";
+import { cryptoIdentity } from "@/utils/crypto-identity";
 
 interface QRCodeBackupPanelProps {
   isOpen: boolean;
@@ -26,10 +26,10 @@ const QRCodeBackupPanel: React.FC<QRCodeBackupPanelProps> = ({ isOpen, onClose }
 
   const generateQRCode = async () => {
     try {
-      const identity = await webAuthnIdentity.getCurrentIdentity();
+      const identity = await cryptoIdentity.getCurrentIdentity();
       if (!identity) return;
 
-      const exportedData = await webAuthnIdentity.exportIdentity(identity.id);
+      const exportedData = await cryptoIdentity.exportIdentity(identity.id);
       const qrString = JSON.stringify(exportedData);
       setQrData(qrString);
       setQrGenerated(true);
@@ -70,7 +70,7 @@ const QRCodeBackupPanel: React.FC<QRCodeBackupPanelProps> = ({ isOpen, onClose }
 
     try {
       const exportedData = JSON.parse(importData.trim());
-      await webAuthnIdentity.importIdentity(exportedData);
+      await cryptoIdentity.importIdentity(exportedData);
       
       toast.success("Identity imported successfully!", {
         description: "The identity has been added to your device."

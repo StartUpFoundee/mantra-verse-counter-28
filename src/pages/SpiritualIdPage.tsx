@@ -4,12 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Home } from "lucide-react";
 import IdentityManager from "@/components/IdentityManager";
-import { UserIdentity } from "@/utils/webauthn-identity";
+import { CryptoIdentity } from "@/utils/crypto-identity";
 
 const SpiritualIdPage: React.FC = () => {
   const navigate = useNavigate();
 
-  const handleIdentitySelected = (identity: UserIdentity) => {
+  const handleIdentitySelected = (identity: CryptoIdentity) => {
     // Redirect to home after identity selection
     navigate("/", { replace: true });
   };
