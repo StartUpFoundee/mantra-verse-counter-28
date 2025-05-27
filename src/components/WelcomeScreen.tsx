@@ -2,7 +2,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { webAuthnIdentity } from "@/utils/webauthn-identity";
+import { cryptoIdentity } from "@/utils/crypto-identity";
 import { toast } from "@/components/ui/sonner";
 
 const WelcomeScreen: React.FC = () => {
@@ -10,7 +10,7 @@ const WelcomeScreen: React.FC = () => {
   
   const handleCreateIdentity = async () => {
     try {
-      const identity = await webAuthnIdentity.createIdentity("New User");
+      const identity = await cryptoIdentity.createIdentity("New User");
       if (identity) {
         toast.success("Identity created successfully!");
         navigate("/", { replace: true });

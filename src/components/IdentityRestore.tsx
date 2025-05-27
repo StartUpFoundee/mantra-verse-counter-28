@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, QrCode, FileText } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
-import { webAuthnIdentity } from "@/utils/webauthn-identity";
+import { cryptoIdentity } from "@/utils/crypto-identity";
 
 interface IdentityRestoreProps {
   onRestoreComplete: () => void;
@@ -31,7 +31,7 @@ const IdentityRestore: React.FC<IdentityRestoreProps> = ({
     setIsRestoring(true);
     try {
       const exportedData = JSON.parse(restoreData.trim());
-      await webAuthnIdentity.importIdentity(exportedData);
+      await cryptoIdentity.importIdentity(exportedData);
       
       toast.success("Restore Successful", {
         description: "Identity restored successfully!"

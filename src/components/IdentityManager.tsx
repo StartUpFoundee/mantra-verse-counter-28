@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,16 +5,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/sonner';
 import { UserPlus, LogIn, Users, Shield, Key, QrCode, Upload, Download } from 'lucide-react';
-import { webAuthnIdentity, UserIdentity, ExportedIdentity } from '@/utils/webauthn-identity';
+import { cryptoIdentity, CryptoIdentity, ExportedCryptoIdentity } from '@/utils/crypto-identity';
 import { QRCode } from '@/components/ui/qr-code';
 
 interface IdentityManagerProps {
-  onIdentitySelected: (identity: UserIdentity) => void;
+  onIdentitySelected: (identity: CryptoIdentity) => void;
 }
 
 const IdentityManager: React.FC<IdentityManagerProps> = ({ onIdentitySelected }) => {
   const [mode, setMode] = useState<'select' | 'create' | 'import'>('select');
-  const [identities, setIdentities] = useState<UserIdentity[]>([]);
+  const [identities, setIdentities] = useState<CryptoIdentity[]>([]);
   const [newName, setNewName] = useState('');
   const [importData, setImportData] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -28,12 +27,12 @@ const IdentityManager: React.FC<IdentityManagerProps> = ({ onIdentitySelected })
 
   const loadIdentities = async () => {
     try {
-      const allIdentities = await webAuthnIdentity.getAllIdentities();
+      const allIdentities = await cryptoIdentity.getAllIdentities();
       setIdentities(allIdentities);
       
       // Auto-login if only one identity exists
       if (allIdentities.length === 1) {
-        const identity = await webAuthnIdentity.loginWithIdentity(allIdentities[0].id);
+        const identity = await cryptoIdentity.loginWithIdentity(allIdentities[0].id);
         onIdentitySelected(identity);
       }
     } catch (error) {
@@ -47,14 +46,14 @@ const IdentityManager: React.FC<IdentityManagerProps> = ({ onIdentitySelected })
       return;
     }
 
-    if (!webAuthnIdentity.isWebAuthnSupported()) {
-      toast.error('WebAuthn is not supported in this browser');
+    if (!cryptoIdentity.isCryptoSupported()) {
+      toast.error('Web Crypto API is not supported in this browser');
       return;
     }
 
     setIsLoading(true);
     try {
-      const identity = await webAuthnIdentity.createIdentity(newName.trim());
+      const identity = await cryptoIdentity.createIdentity(newName.trim());
       toast.success('Identity created successfully!', {
         description: 'Your cryptographic identity has been generated securely.'
       });
@@ -72,7 +71,7 @@ const IdentityManager: React.FC<IdentityManagerProps> = ({ onIdentitySelected })
 
   const handleSelectIdentity = async (identityId: string) => {
     try {
-      const identity = await webAuthnIdentity.loginWithIdentity(identityId);
+      const identity = await cryptoIdentity.loginWithIdentity(identityId);
       toast.success(`Welcome back, ${identity.name}!`);
       onIdentitySelected(identity);
     } catch (error) {
@@ -89,8 +88,8 @@ const IdentityManager: React.FC<IdentityManagerProps> = ({ onIdentitySelected })
 
     setIsLoading(true);
     try {
-      const exportedData: ExportedIdentity = JSON.parse(importData.trim());
-      const identity = await webAuthnIdentity.importIdentity(exportedData);
+      const exportedData: ExportedCryptoIdentity = JSON.parse(importData.trim());
+      const identity = await cryptoIdentity.importIdentity(exportedData);
       
       toast.success('Identity imported successfully!', {
         description: `Welcome ${identity.name}! Your identity has been restored.`
@@ -110,7 +109,7 @@ const IdentityManager: React.FC<IdentityManagerProps> = ({ onIdentitySelected })
 
   const handleExportIdentity = async (identityId: string) => {
     try {
-      const exportedData = await webAuthnIdentity.exportIdentity(identityId);
+      const exportedData = await cryptoIdentity.exportIdentity(identityId);
       const exportString = JSON.stringify(exportedData, null, 2);
       
       // Copy to clipboard
@@ -135,7 +134,7 @@ const IdentityManager: React.FC<IdentityManagerProps> = ({ onIdentitySelected })
     }
 
     try {
-      await webAuthnIdentity.deleteIdentity(identityId);
+      await cryptoIdentity.deleteIdentity(identityId);
       toast.success('Identity deleted successfully');
       await loadIdentities();
     } catch (error) {
@@ -144,19 +143,19 @@ const IdentityManager: React.FC<IdentityManagerProps> = ({ onIdentitySelected })
     }
   };
 
-  if (!webAuthnIdentity.isWebAuthnSupported()) {
+  if (!cryptoIdentity.isCryptoSupported()) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white p-4">
         <Card className="w-full max-w-md bg-red-900/20 border-red-500">
           <CardHeader>
             <CardTitle className="text-red-400 flex items-center gap-2">
               <Shield className="h-5 w-5" />
-              WebAuthn Not Supported
+              Crypto API Not Supported
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-300 mb-4">
-              Your browser doesn't support WebAuthn, which is required for secure identity management.
+              Your browser doesn't support the Web Crypto API, which is required for secure identity management.
             </p>
             <p className="text-sm text-gray-400">
               Please use a modern browser like Chrome, Firefox, Safari, or Edge.
@@ -248,7 +247,7 @@ const IdentityManager: React.FC<IdentityManagerProps> = ({ onIdentitySelected })
             
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
               <p className="text-xs text-amber-400">
-                🔐 Your identity will be secured with WebAuthn cryptography and stored locally on this device.
+                🔐 Your identity will be secured with Web Crypto API and stored locally on this device.
               </p>
             </div>
           </CardContent>
@@ -407,7 +406,7 @@ const IdentityManager: React.FC<IdentityManagerProps> = ({ onIdentitySelected })
           
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
             <p className="text-xs text-amber-400">
-              🔒 All identities are secured with WebAuthn cryptography and stored locally on your device.
+              🔒 All identities are secured with Web Crypto API and stored locally on your device.
             </p>
           </div>
         </CardContent>

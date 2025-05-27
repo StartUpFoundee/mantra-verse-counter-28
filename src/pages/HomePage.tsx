@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mic, Hand, Infinity, Clock, Trophy, User } from "lucide-react";
@@ -10,11 +9,11 @@ import WelcomePopup from "@/components/WelcomePopup";
 import { getLifetimeCount, getTodayCount } from "@/utils/indexedDBUtils";
 import { getStreakData, recordTodaysActivity } from "@/utils/activeDaysUtils";
 import { getAchievementsForProfile } from "@/utils/motivationUtils";
-import { UserIdentity } from "@/utils/webauthn-identity";
+import { CryptoIdentity } from "@/utils/crypto-identity";
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const [currentIdentity, setCurrentIdentity] = useState<UserIdentity | null>(null);
+  const [currentIdentity, setCurrentIdentity] = useState<CryptoIdentity | null>(null);
   const [showProfile, setShowProfile] = useState(false);
   const [lifetimeCount, setLifetimeCount] = useState<number>(0);
   const [todayCount, setTodayCount] = useState<number>(0);
@@ -57,7 +56,7 @@ const HomePage: React.FC = () => {
     loadData();
   }, [currentIdentity]);
 
-  const handleIdentitySelected = (identity: UserIdentity) => {
+  const handleIdentitySelected = (identity: CryptoIdentity) => {
     setCurrentIdentity(identity);
     setShowProfile(false);
   };

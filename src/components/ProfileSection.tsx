@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/sonner';
 import { User, Download, Upload, QrCode, LogOut, Shield, Key } from 'lucide-react';
-import { webAuthnIdentity, UserIdentity, ExportedIdentity } from '@/utils/webauthn-identity';
+import { cryptoIdentity, CryptoIdentity, ExportedCryptoIdentity } from '@/utils/crypto-identity';
 import { QRCode } from '@/components/ui/qr-code';
 
 interface ProfileSectionProps {
-  identity: UserIdentity;
+  identity: CryptoIdentity;
   onLogout: () => void;
 }
 
@@ -20,7 +20,7 @@ const ProfileSection: React.FC<ProfileSectionProps> = ({ identity, onLogout }) =
 
   const handleExport = async () => {
     try {
-      const exportedData = await webAuthnIdentity.exportIdentity(identity.id);
+      const exportedData = await cryptoIdentity.exportIdentity(identity.id);
       const exportString = JSON.stringify(exportedData, null, 2);
       
       // Copy to clipboard
@@ -44,8 +44,8 @@ const ProfileSection: React.FC<ProfileSectionProps> = ({ identity, onLogout }) =
     }
 
     try {
-      const exportedData: ExportedIdentity = JSON.parse(importData.trim());
-      await webAuthnIdentity.importIdentity(exportedData);
+      const exportedData: ExportedCryptoIdentity = JSON.parse(importData.trim());
+      await cryptoIdentity.importIdentity(exportedData);
       
       toast.success('Identity imported successfully!', {
         description: 'The identity has been added to your device.'
@@ -194,7 +194,7 @@ const ProfileSection: React.FC<ProfileSectionProps> = ({ identity, onLogout }) =
             <span className="text-amber-400 text-sm font-medium">Security Status</span>
           </div>
           <p className="text-xs text-amber-300">
-            🔐 Protected with WebAuthn cryptography
+            🔐 Protected with Web Crypto API
           </p>
           <p className="text-xs text-amber-300">
             🔒 Data encrypted and stored locally

@@ -1,24 +1,24 @@
 
 import React, { useState, useEffect } from "react";
-import { webAuthnIdentity, UserIdentity } from "@/utils/webauthn-identity";
+import { cryptoIdentity, CryptoIdentity } from "@/utils/crypto-identity";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { User, LogOut } from "lucide-react";
 
 const ProfileHeader: React.FC = () => {
-  const [currentIdentity, setCurrentIdentity] = useState<UserIdentity | null>(null);
+  const [currentIdentity, setCurrentIdentity] = useState<CryptoIdentity | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   
   useEffect(() => {
     const loadIdentity = async () => {
-      const identity = await webAuthnIdentity.getCurrentIdentity();
+      const identity = await cryptoIdentity.getCurrentIdentity();
       setCurrentIdentity(identity);
     };
     loadIdentity();
   }, []);
 
   const handleLogout = () => {
-    webAuthnIdentity.logout();
+    cryptoIdentity.logout();
     setCurrentIdentity(null);
     window.location.reload();
   };
