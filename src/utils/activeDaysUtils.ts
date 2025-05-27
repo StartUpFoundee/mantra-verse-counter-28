@@ -1,12 +1,9 @@
+import { getTodayCount } from './indexedDBUtils';
 
-import { getTodayCount, getLifetimeCount, updateMantraCounts } from './indexedDBUtils';
-import { getCurrentSimpleUserIdentity } from './simpleIdentityUtils';
-
-export interface ActiveDayData {
+export interface DayStatus {
   date: string;
-  count: number;
-  level: 'none' | 'light' | 'medium' | 'strong';
-  intensity: number;
+  hasActivity: boolean;
+  mantraCount: number;
 }
 
 export interface StreakInfo {
@@ -16,143 +13,103 @@ export interface StreakInfo {
 }
 
 /**
- * Determines the motivation level based on chant count
+ * Records today's activity with the given mantra count.
+ * @param mantraCount The number of mantras chanted today.
  */
-export const getMotivationLevel = (count: number): { level: string; intensity: number; color: string } => {
-  if (count === 0) {
-    return { level: 'none', intensity: 0, color: 'bg-gray-200 dark:bg-gray-800' };
-  } else if (count < 54) {
-    return { level: 'light', intensity: 25, color: 'bg-green-200 dark:bg-green-900' };
-  } else if (count < 108) {
-    return { level: 'medium-light', intensity: 40, color: 'bg-green-300 dark:bg-green-800' };
-  } else if (count < 324) {
-    return { level: 'medium', intensity: 60, color: 'bg-green-400 dark:bg-green-700' };
-  } else if (count < 540) {
-    return { level: 'medium-strong', intensity: 80, color: 'bg-green-500 dark:bg-green-600' };
-  } else if (count < 1008) {
-    return { level: 'strong', intensity: 90, color: 'bg-green-600 dark:bg-green-500' };
+export const recordTodaysActivity = async (mantraCount: number): Promise<void> => {
+  const today = new Date().toISOString().slice(0, 10);
+  let existingData = localStorage.getItem('activeDays');
+  let activeDays: DayStatus[] = existingData ? JSON.parse(existingData) : [];
+
+  // Check if today's activity already exists
+  const todayIndex = activeDays.findIndex(day => day.date === today);
+
+  if (todayIndex !== -1) {
+    // Update existing activity
+    activeDays[todayIndex] = { date: today, hasActivity: true, mantraCount };
   } else {
-    return { level: 'strongest', intensity: 100, color: 'bg-green-700 dark:bg-green-400' };
+    // Add new activity
+    activeDays.push({ date: today, hasActivity: true, mantraCount });
   }
+
+  localStorage.setItem('activeDays', JSON.stringify(activeDays));
 };
 
 /**
- * Store today's activity with email-based storage
+ * Retrieves the activity status for a specific date.
+ * @param date The date to check (YYYY-MM-DD).
+ * @returns An object containing the date, activity status, and mantra count, or null if not found.
  */
-export const recordTodaysActivity = async (additionalCount: number = 0): Promise<void> => {
-  const today = new Date().toISOString().split('T')[0];
-  const user = getCurrentSimpleUserIdentity();
-  
-  if (!user) return;
-  
-  // Get the actual today count from the main system
-  const currentTodayCount = await getTodayCount();
-  const totalCount = currentTodayCount;
-  
-  // Store in localStorage with email-based key for persistence
-  const activityKey = `mantra_activity_${user.email}_${today}`;
-  localStorage.setItem(activityKey, JSON.stringify({
-    date: today,
-    count: totalCount,
-    timestamp: Date.now(),
-    userEmail: user.email,
-    userId: user.uniqueId
-  }));
-  
-  console.log(`Recorded activity for ${today}: ${totalCount} mantras (Email: ${user.email})`);
+export const getActivityForDate = (date: string): DayStatus | null => {
+  const existingData = localStorage.getItem('activeDays');
+  if (!existingData) return null;
+
+  const activeDays: DayStatus[] = JSON.parse(existingData);
+  const day = activeDays.find(day => day.date === date);
+  return day || null;
 };
 
 /**
- * Gets activity data for the calendar with email-based storage
+ * Retrieves all recorded active days.
+ * @returns An array of DayStatus objects.
  */
-export const getActivityData = async (): Promise<{[date: string]: number}> => {
-  const activityData: {[date: string]: number} = {};
-  const user = getCurrentSimpleUserIdentity();
-  
-  if (!user) return activityData;
-  
-  const today = new Date().toISOString().split('T')[0];
-  
-  // Always get today's count from the main system first
-  const todayCount = await getTodayCount();
-  console.log(`Today's count from main system: ${todayCount}`);
-  
-  if (todayCount > 0) {
-    activityData[today] = todayCount;
-    // Ensure it's stored for persistence
-    await recordTodaysActivity(0);
-  }
-  
-  // Get all stored activity data from localStorage for this user's email
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith(`mantra_activity_${user.email}_`)) {
-      try {
-        const data = JSON.parse(localStorage.getItem(key) || '{}');
-        if (data.date && data.count !== undefined && data.userEmail === user.email) {
-          // Don't override today's count with stored data if main system has newer data
-          if (data.date !== today || todayCount === 0) {
-            activityData[data.date] = data.count;
-          }
-        }
-      } catch (error) {
-        console.error('Error parsing activity data:', error);
-      }
-    }
-  }
-  
-  console.log('Activity data loaded for calendar:', activityData);
-  return activityData;
+export const getAllActiveDays = (): DayStatus[] => {
+  const existingData = localStorage.getItem('activeDays');
+  return existingData ? JSON.parse(existingData) : [];
 };
 
 /**
- * Gets streak data based on email-linked activity
+ * Calculates streak data including current streak, max streak, and total active days.
+ * @returns An object containing streak information.
  */
 export const getStreakData = async (): Promise<StreakInfo> => {
-  const activityData = await getActivityData();
+  const activeDays = getAllActiveDays();
   const today = new Date();
-  const dates = Object.keys(activityData).sort();
-  
+  const todayString = today.toISOString().slice(0, 10);
   let currentStreak = 0;
   let maxStreak = 0;
-  let tempStreak = 0;
   let totalActiveDays = 0;
-  
-  // Count total active days
-  totalActiveDays = Object.values(activityData).filter(count => count > 0).length;
-  
-  // Calculate current streak from today backwards
-  for (let i = 0; i < 365; i++) {
-    const checkDate = new Date(today);
-    checkDate.setDate(today.getDate() - i);
-    const dateStr = checkDate.toISOString().split('T')[0];
-    
-    const count = activityData[dateStr] || 0;
-    
-    if (count > 0) {
+  let tempStreak = 0;
+  let currentDate = today;
+
+  // Sort active days by date
+  activeDays.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  for (let i = activeDays.length - 1; i >= 0; i--) {
+    const day = activeDays[i];
+    totalActiveDays++;
+
+    const dayDate = new Date(day.date);
+    const diffTime = Math.abs(currentDate.getTime() - dayDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= 1) {
       tempStreak++;
-      if (i === 0) {
-        // If today has activity, start current streak
-        currentStreak = tempStreak;
-      } else if (tempStreak === i + 1) {
-        // Consecutive days from today
-        currentStreak = tempStreak;
-      }
+      currentDate = dayDate;
     } else {
-      maxStreak = Math.max(maxStreak, tempStreak);
-      if (i === 0) {
-        // If no activity today, current streak is 0
-        currentStreak = 0;
-      }
-      tempStreak = 0;
+      break;
     }
   }
-  
-  maxStreak = Math.max(maxStreak, tempStreak);
-  maxStreak = Math.max(maxStreak, currentStreak);
-  
-  console.log(`Streak data: Current=${currentStreak}, Max=${maxStreak}, Total=${totalActiveDays}`);
-  
+
+  currentStreak = tempStreak;
+
+  // Calculate max streak
+  let tempMaxStreak = 0;
+  for (let i = 0; i < activeDays.length; i++) {
+    tempMaxStreak++;
+    if (i + 1 < activeDays.length) {
+      const day1Date = new Date(activeDays[i].date);
+      const day2Date = new Date(activeDays[i + 1].date);
+      const diffTime = Math.abs(day2Date.getTime() - day1Date.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays > 1) {
+        maxStreak = Math.max(maxStreak, tempMaxStreak);
+        tempMaxStreak = 0;
+      }
+    }
+  }
+  maxStreak = Math.max(maxStreak, tempMaxStreak);
+
   return {
     currentStreak,
     maxStreak,
@@ -161,24 +118,9 @@ export const getStreakData = async (): Promise<StreakInfo> => {
 };
 
 /**
- * Force refresh today's activity data
+ * Refreshes today's activity by recounting mantras and updating the activity record.
  */
 export const refreshTodaysActivity = async (): Promise<void> => {
-  const user = getCurrentSimpleUserIdentity();
-  if (!user) return;
-  
-  const today = new Date().toISOString().split('T')[0];
   const todayCount = await getTodayCount();
-  
-  // Force update today's activity in localStorage
-  const activityKey = `mantra_activity_${user.email}_${today}`;
-  localStorage.setItem(activityKey, JSON.stringify({
-    date: today,
-    count: todayCount,
-    timestamp: Date.now(),
-    userEmail: user.email,
-    userId: user.uniqueId
-  }));
-  
-  console.log(`Force refreshed today's activity: ${todayCount} mantras`);
+  await recordTodaysActivity(todayCount);
 };

@@ -4,8 +4,6 @@
  * This file is kept for potential future backup features
  */
 
-import { getCurrentUserIdentity } from './portableIdentityUtils';
-
 export interface BackupSchedule {
   enabled: boolean;
   lastBackupDate: string | null;

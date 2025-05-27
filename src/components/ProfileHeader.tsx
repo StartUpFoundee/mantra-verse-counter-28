@@ -1,23 +1,29 @@
 
 import React, { useState, useEffect } from "react";
-import { getCurrentSimpleUserIdentity } from "@/utils/simpleIdentityUtils";
+import { webAuthnIdentity, UserIdentity } from "@/utils/webauthn-identity";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import ProfileDropdown from "./ProfileDropdown";
+import { User, LogOut } from "lucide-react";
 
 const ProfileHeader: React.FC = () => {
-  const [userData, setUserData] = useState<any>(null);
+  const [currentIdentity, setCurrentIdentity] = useState<UserIdentity | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   
   useEffect(() => {
-    // Get user identity from the new system
-    const identity = getCurrentSimpleUserIdentity();
-    if (identity) {
-      setUserData(identity);
-    }
+    const loadIdentity = async () => {
+      const identity = await webAuthnIdentity.getCurrentIdentity();
+      setCurrentIdentity(identity);
+    };
+    loadIdentity();
   }, []);
 
-  if (!userData) return null;
+  const handleLogout = () => {
+    webAuthnIdentity.logout();
+    setCurrentIdentity(null);
+    window.location.reload();
+  };
+
+  if (!currentIdentity) return null;
 
   return (
     <div className="relative">
@@ -32,14 +38,27 @@ const ProfileHeader: React.FC = () => {
           </AvatarFallback>
         </Avatar>
         <span className="text-amber-400 text-sm hidden sm:inline-block">
-          {userData.name}
+          {currentIdentity.name}
         </span>
       </Button>
 
       {dropdownOpen && (
-        <ProfileDropdown 
-          onClose={() => setDropdownOpen(false)} 
-        />
+        <div className="absolute top-full right-0 mt-2 w-48 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg z-50">
+          <div className="p-4 border-b border-zinc-700">
+            <p className="text-white font-medium">{currentIdentity.name}</p>
+            <p className="text-xs text-gray-400">ID: {currentIdentity.id.substring(0, 12)}...</p>
+          </div>
+          <div className="p-2">
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-red-400 hover:bg-red-500/10"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );

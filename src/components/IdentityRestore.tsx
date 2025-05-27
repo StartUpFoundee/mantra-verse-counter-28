@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, QrCode, FileText } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
-import { recoverUserIdentity } from "@/utils/portableIdentityUtils";
+import { webAuthnIdentity } from "@/utils/webauthn-identity";
 
 interface IdentityRestoreProps {
   onRestoreComplete: () => void;
@@ -22,7 +22,7 @@ const IdentityRestore: React.FC<IdentityRestoreProps> = ({
 
   const handleRestore = async () => {
     if (!restoreData.trim()) {
-      toast("Missing Data", {
+      toast.error("Missing Data", {
         description: "Please provide backup data to restore"
       });
       return;
@@ -30,22 +30,17 @@ const IdentityRestore: React.FC<IdentityRestoreProps> = ({
 
     setIsRestoring(true);
     try {
-      const identity = await recoverUserIdentity(restoreData.trim());
+      const exportedData = JSON.parse(restoreData.trim());
+      await webAuthnIdentity.importIdentity(exportedData);
       
-      if (identity) {
-        toast("Restore Successful", {
-          description: `Welcome back, ${identity.name}!`
-        });
-        onRestoreComplete();
-      } else {
-        toast("Restore Failed", {
-          description: "Invalid backup data. Please check and try again."
-        });
-      }
+      toast.success("Restore Successful", {
+        description: "Identity restored successfully!"
+      });
+      onRestoreComplete();
     } catch (error) {
       console.error("Restore error:", error);
-      toast("Restore Error", {
-        description: "Failed to restore identity. Please try again."
+      toast.error("Restore Error", {
+        description: "Failed to restore identity. Please check the data format."
       });
     } finally {
       setIsRestoring(false);
@@ -63,7 +58,7 @@ const IdentityRestore: React.FC<IdentityRestoreProps> = ({
         const jsonData = JSON.parse(content);
         setRestoreData(jsonData.data || JSON.stringify(jsonData));
       } catch (error) {
-        toast("Invalid File", {
+        toast.error("Invalid File", {
           description: "The selected file is not a valid backup file"
         });
       }

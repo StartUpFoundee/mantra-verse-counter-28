@@ -2,15 +2,24 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import SimpleIdentityCreator from "./SimpleIdentityCreator";
+import { webAuthnIdentity } from "@/utils/webauthn-identity";
+import { toast } from "@/components/ui/sonner";
 
 const WelcomeScreen: React.FC = () => {
   const navigate = useNavigate();
   
-  const handleIdentityCreated = () => {
-    // Navigate to home page after identity creation
-    navigate("/", { replace: true });
-    window.location.reload(); // Force reload to update the app state
+  const handleCreateIdentity = async () => {
+    try {
+      const identity = await webAuthnIdentity.createIdentity("New User");
+      if (identity) {
+        toast.success("Identity created successfully!");
+        navigate("/", { replace: true });
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error("Error creating identity:", error);
+      toast.error("Failed to create identity. Please try again.");
+    }
   };
 
   return (
@@ -28,7 +37,12 @@ const WelcomeScreen: React.FC = () => {
         </p>
       </div>
 
-      <SimpleIdentityCreator onIdentityCreated={handleIdentityCreated} />
+      <Button
+        onClick={handleCreateIdentity}
+        className="bg-amber-600 hover:bg-amber-700 text-white px-8 py-3 text-lg"
+      >
+        Create New Identity
+      </Button>
       
       <div className="text-center space-y-2 max-w-md">
         <p className="text-sm text-gray-400">

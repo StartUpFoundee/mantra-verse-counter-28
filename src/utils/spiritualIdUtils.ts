@@ -31,4 +31,11 @@ export const isUserLoggedIn = (): boolean => {
   return localStorage.getItem('chantTrackerUserData') !== null;
 };
 
+/**
+ * Generate QR data for spiritual ID (legacy compatibility)
+ */
+export const generateIdQRData = (spiritualId: string): string => {
+  return `https://mantra-counter.app/id/${spiritualId}`;
+};
+
 export { getUserData, saveUserData, logoutUser };
