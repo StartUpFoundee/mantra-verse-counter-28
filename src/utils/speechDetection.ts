@@ -1,4 +1,3 @@
-
 interface SpeechDetectionProps {
   onSpeechDetected: () => void;
   onSpeechEnded: () => void;
@@ -13,8 +12,8 @@ export class SpeechDetection {
   private isListening = false;
   private lastSpeechTime = 0;
   private isSpeaking = false;
-  private silenceTimeout: number | null = null;
-  private animationFrame: number | null = null;
+  private silenceTimeout: ReturnType<typeof setTimeout> | null = null;
+  private animationFrame: ReturnType<typeof setTimeout> | null = null;
   private onSpeechDetected: () => void;
   private onSpeechEnded: () => void;
   private minDecibels: number;
@@ -22,7 +21,7 @@ export class SpeechDetection {
   private baselineNoise = 0;
   private volumeBuffer: number[] = [];
   private isReadyForNextMantra = true;
-  private mantraReadyTimeout: number | null = null;
+  private mantraReadyTimeout: ReturnType<typeof setTimeout> | null = null;
   private mantraInProgress = false;
   private silenceTimer = 0;
   private audioFeedback: AudioContext | null = null;
@@ -94,7 +93,7 @@ export class SpeechDetection {
     }
     
     if (this.animationFrame) {
-      cancelAnimationFrame(this.animationFrame);
+      clearTimeout(this.animationFrame);
       this.animationFrame = null;
     }
     
@@ -257,7 +256,7 @@ export class SpeechDetection {
             this.isReadyForNextMantra = false;
             
             // Set ready for next mantra after small delay
-            this.mantraReadyTimeout = window.setTimeout(() => {
+            this.mantraReadyTimeout = setTimeout(() => {
               this.isReadyForNextMantra = true;
               console.log("✅ Ready for next mantra");
             }, 500);
